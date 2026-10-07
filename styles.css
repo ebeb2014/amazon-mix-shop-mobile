@@ -122,3 +122,218 @@ main { padding: 18px 16px 96px; max-width: 840px; margin:0 auto; }
 .push-status.error {
   color:#991b1b;
 }
+
+
+/* Dashboard V2 */
+.hero-card {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  padding:22px;
+  border-radius:24px;
+  color:#fff;
+  background:linear-gradient(145deg,#111827,#1f2937 58%,#374151);
+  box-shadow:0 16px 40px rgba(17,24,39,.18);
+  margin-bottom:14px;
+}
+.hero-card h2 {
+  margin:4px 0 4px;
+  font-size:26px;
+  letter-spacing:-.02em;
+}
+.eyebrow {
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.11em;
+  opacity:.68;
+}
+.hero-date {
+  font-size:13px;
+  opacity:.78;
+  text-transform:capitalize;
+}
+.icon-refresh {
+  width:42px;
+  height:42px;
+  border-radius:14px;
+  border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.08);
+  color:white;
+  font-size:23px;
+}
+.kpi-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.kpi-card {
+  position:relative;
+  overflow:hidden;
+  background:#fff;
+  border-radius:20px;
+  padding:16px;
+  box-shadow:0 7px 24px rgba(15,23,42,.06);
+  border:1px solid rgba(15,23,42,.04);
+}
+.kpi-card::after {
+  content:"";
+  position:absolute;
+  width:70px;
+  height:70px;
+  right:-28px;
+  top:-28px;
+  border-radius:50%;
+  background:rgba(17,24,39,.04);
+}
+.kpi-icon {
+  font-size:21px;
+  margin-bottom:12px;
+}
+.kpi-label {
+  font-size:12px;
+  color:#6b7280;
+  font-weight:700;
+}
+.kpi-card strong {
+  display:block;
+  margin-top:4px;
+  font-size:24px;
+  letter-spacing:-.03em;
+}
+.kpi-card small {
+  display:block;
+  margin-top:4px;
+  color:#9ca3af;
+  font-size:11px;
+}
+.kpi-primary {
+  background:linear-gradient(145deg,#f8fafc,#eef2ff);
+}
+.kpi-warning {
+  background:linear-gradient(145deg,#fff7ed,#fffbeb);
+}
+.dashboard-section {
+  background:#fff;
+  border-radius:22px;
+  padding:17px;
+  margin-top:14px;
+  box-shadow:0 7px 24px rgba(15,23,42,.05);
+  border:1px solid rgba(15,23,42,.04);
+}
+.section-title-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.section-title-row h3 {
+  margin:3px 0 0;
+  font-size:18px;
+}
+.section-title-row > strong {
+  font-size:15px;
+}
+.text-btn {
+  border:0;
+  background:transparent;
+  font-weight:750;
+  color:#374151;
+  padding:6px;
+}
+.mini-chart {
+  height:150px;
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  align-items:end;
+  gap:7px;
+  margin-top:18px;
+}
+.chart-col {
+  min-width:0;
+  height:100%;
+  display:grid;
+  grid-template-rows:22px 1fr 20px;
+  align-items:end;
+  text-align:center;
+}
+.chart-value {
+  font-size:9px;
+  color:#9ca3af;
+  overflow:hidden;
+}
+.chart-bar-wrap {
+  height:100%;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+}
+.chart-bar {
+  width:min(28px,72%);
+  min-height:8px;
+  border-radius:9px 9px 4px 4px;
+  background:linear-gradient(180deg,#111827,#4b5563);
+}
+.chart-label {
+  padding-top:5px;
+  font-size:10px;
+  color:#6b7280;
+  text-transform:capitalize;
+}
+.recent-list {
+  display:grid;
+  gap:2px;
+  margin-top:10px;
+}
+.recent-item {
+  display:grid;
+  grid-template-columns:38px 1fr auto;
+  align-items:center;
+  gap:10px;
+  padding:11px 2px;
+  border-bottom:1px solid #f0f2f5;
+}
+.recent-item:last-child {
+  border-bottom:0;
+}
+.recent-icon {
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:12px;
+  background:#f3f4f6;
+}
+.recent-main {
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+.recent-main strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+}
+.recent-main span {
+  font-size:11px;
+  color:#9ca3af;
+}
+.recent-amount {
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.empty-state {
+  padding:18px 4px;
+  text-align:center;
+  color:#9ca3af;
+  font-size:13px;
+}
+@media (max-width: 430px) {
+  main { padding-left:12px; padding-right:12px; }
+  .hero-card { padding:18px; border-radius:21px; }
+  .hero-card h2 { font-size:23px; }
+  .kpi-card { padding:14px; }
+  .kpi-card strong { font-size:21px; }
+}
