@@ -5,6 +5,148 @@ const mainView = $("mainView");
 let session = null;
 let currentAppUser = null;
 
+const VAPID_PUBLIC_KEY =
+  "BDv2FI568ZtOlWFTcmZHWyQG2DesQUbei-pKIYf0WzApJsnMV2MM-cf7qK8bzYLr44GdN2hUt6d55CL5NLOeQLM";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(ch => ch.charCodeAt(0)));
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function isStandalonePWA() {
+  return window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+}
+
+function setPushStatus(message, isError=false) {
+  const el = $("pushStatus");
+  if (!el) return;
+  el.textContent = message || "";
+  el.classList.toggle("error", !!isError);
+}
+
+async function savePushSubscription(subscription) {
+  if (!currentAppUser?.owner_id || !session?.user?.id) {
+    throw new Error("Identitatea Administratorului nu este disponibilă.");
+  }
+
+  const json = subscription.toJSON();
+  const response = await fetch(
+    cfg.supabaseUrl +
+      "/rest/v1/ams_push_subscriptions?on_conflict=endpoint",
+    {
+      method: "POST",
+      headers: {
+        ...apiHeaders(true),
+        "Prefer": "resolution=merge-duplicates,return=representation"
+      },
+      body: JSON.stringify({
+        owner_id: currentAppUser.owner_id,
+        user_id: session.user.id,
+        endpoint: json.endpoint,
+        p256dh: json.keys?.p256dh || "",
+        auth_key: json.keys?.auth || "",
+        device_label:
+          (isIOS() ? "iPhone/iPad" : navigator.platform || "Browser"),
+        enabled: true,
+        updated_at: new Date().toISOString()
+      })
+    }
+  );
+
+  if (!response.ok) {
+    let payload = {};
+    try { payload = await response.json(); } catch (_) {}
+    throw new Error(
+      payload?.message || payload?.error || "Nu pot salva abonamentul push."
+    );
+  }
+}
+
+async function enablePushNotifications() {
+  if (!("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !("Notification" in window)) {
+    setPushStatus(
+      "Acest browser nu suportă notificările push pentru aplicație.",
+      true
+    );
+    return;
+  }
+
+  if (isIOS() && !isStandalonePWA()) {
+    setPushStatus(
+      "Pe iPhone: Share → Add to Home Screen, apoi deschide Amazon Mix Shop din iconiță și apasă din nou aici.",
+      true
+    );
+    return;
+  }
+
+  const button = $("enableNotificationsBtn");
+  button.disabled = true;
+  setPushStatus("Activez notificările...");
+
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      throw new Error("Permisiunea pentru notificări nu a fost acordată.");
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    await savePushSubscription(subscription);
+    setPushStatus("✅ Notificările pentru aprobări sunt active.");
+    button.textContent = "🔔 Notificări active";
+  } catch (error) {
+    setPushStatus(error?.message || String(error), true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function refreshPushUi() {
+  const button = $("enableNotificationsBtn");
+  if (!button) return;
+
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    button.textContent = "🔕 Push indisponibil";
+    button.disabled = true;
+    return;
+  }
+
+  if (isIOS() && !isStandalonePWA()) {
+    setPushStatus(
+      "Pentru notificări pe iPhone, instalează întâi aplicația pe Home Screen."
+    );
+    return;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (subscription && Notification.permission === "granted") {
+      button.textContent = "🔔 Notificări active";
+      setPushStatus("✅ Telefonul este abonat la aprobări.");
+    }
+  } catch (_) {}
+}
+
 function showStatus(message, isError=false) {
   const el = $("loginStatus");
   el.textContent = message || "";
@@ -123,7 +265,7 @@ async function loadIdentity() {
 
   const rows = await restSelect(
     "ams_app_users",
-    "select=user_id,username,display_name,role_name,active,is_primary_admin&user_id=eq." +
+    "select=user_id,owner_id,username,display_name,role_name,active,is_primary_admin&user_id=eq." +
       encodeURIComponent(userId) + "&limit=1"
   );
 
@@ -312,6 +454,13 @@ async function enterApp() {
   loginView.classList.add("hidden");
   mainView.classList.remove("hidden");
   await Promise.all([loadDashboard(), loadApprovals()]);
+  await refreshPushUi();
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("approval")) {
+    setPanel("approvalsPanel");
+    await loadApprovals();
+  }
 }
 
 $("togglePasswordBtn").addEventListener("click", () => {
@@ -355,6 +504,7 @@ $("logoutBtn").addEventListener("click", () => {
 });
 
 $("refreshDashboardBtn").onclick = () => loadDashboard().catch(showMainError);
+$("enableNotificationsBtn").onclick = () => enablePushNotifications();
 $("refreshStockBtn").onclick = () => loadStock().catch(showMainError);
 $("refreshApprovalsBtn").onclick = () => loadApprovals().catch(showMainError);
 $("refreshHistoryBtn").onclick = () => loadHistory().catch(showMainError);
