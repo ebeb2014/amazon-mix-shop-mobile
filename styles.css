@@ -100,3 +100,25 @@ main { padding: 18px 16px 96px; max-width: 840px; margin:0 auto; }
   .grid-cards { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .metric-card.alert { grid-column:auto; }
 }
+
+
+.dashboard-actions {
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+}
+.compact-btn {
+  width:auto;
+  margin-top:0;
+  padding:11px 14px;
+}
+.push-status {
+  margin-top:10px;
+  min-height:20px;
+  font-size:13px;
+  color:#166534;
+}
+.push-status.error {
+  color:#991b1b;
+}
