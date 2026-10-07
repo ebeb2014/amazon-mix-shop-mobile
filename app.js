@@ -1,5 +1,7 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 const cfg = window.AMS_CONFIG;
-const supabase = window.supabase.createClient(cfg.supabaseUrl, cfg.publishableKey, {
+const supabase = createClient(cfg.supabaseUrl, cfg.publishableKey, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
 });
 
