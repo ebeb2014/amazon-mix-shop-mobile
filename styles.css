@@ -464,3 +464,29 @@ main { padding: 18px 16px 96px; max-width: 840px; margin:0 auto; }
   font-size:11px; line-height:1.45; color:#64748b;
   margin:11px 2px 0;
 }
+
+/* Dashboard V9: costul achiziției vizibil separat */
+.financial-cost {
+  margin-top:12px;
+  padding:14px 15px;
+  border:1px solid #e2e8f0;
+  border-radius:15px;
+  background:#f8fafc;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.financial-cost span {
+  font-size:12px;
+  font-weight:700;
+  color:#475569;
+  line-height:1.4;
+}
+.financial-cost strong {
+  text-align:right;
+  font-size:18px;
+  color:#0f172a;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
