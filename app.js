@@ -278,20 +278,142 @@ async function loadIdentity() {
     (data.display_name || data.username) + " • " + (data.role_name || "");
 }
 
+
+function localISODate(date) {
+  const d = new Date(date);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
+
+function money(value) {
+  return Number(value || 0).toLocaleString("ro-RO", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + " lei";
+}
+
+async function loadSalesDashboardData() {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const start = new Date(today);
+  start.setDate(today.getDate() - 6);
+
+  const startISO = localISODate(start);
+  const rows = await restSelect(
+    "ams_sales",
+    "select=id,product_code,sale_price,sale_date,payment_method,client,created_at" +
+    "&sale_date=gte." + encodeURIComponent(startISO) +
+    "&order=id.desc"
+  );
+
+  const byDate = new Map();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    byDate.set(localISODate(d), { total: 0, count: 0 });
+  }
+
+  for (const row of rows || []) {
+    const key = String(row.sale_date || "").slice(0, 10);
+    if (!byDate.has(key)) continue;
+    const bucket = byDate.get(key);
+    bucket.total += Number(row.sale_price || 0);
+    bucket.count += 1;
+  }
+
+  const todayKey = localISODate(today);
+  const yesterdayKey = localISODate(yesterday);
+  const todayData = byDate.get(todayKey) || { total: 0, count: 0 };
+  const yesterdayData = byDate.get(yesterdayKey) || { total: 0, count: 0 };
+
+  $("salesTodayValue").textContent = money(todayData.total);
+  $("salesTodayCount").textContent =
+    todayData.count + (todayData.count === 1 ? " produs vândut" : " produse vândute");
+
+  $("salesYesterdayValue").textContent = money(yesterdayData.total);
+  $("salesYesterdayCount").textContent =
+    yesterdayData.count + (yesterdayData.count === 1 ? " produs vândut" : " produse vândute");
+
+  const weekTotal = [...byDate.values()]
+    .reduce((sum, item) => sum + item.total, 0);
+  $("weekSalesTotal").textContent = money(weekTotal);
+
+  const chart = $("salesWeekChart");
+  chart.innerHTML = "";
+  const maxValue = Math.max(1, ...[...byDate.values()].map(x => x.total));
+  const dayFmt = new Intl.DateTimeFormat("ro-RO", { weekday: "short" });
+
+  for (const [dateKey, item] of byDate.entries()) {
+    const d = new Date(dateKey + "T12:00:00");
+    const col = document.createElement("div");
+    col.className = "chart-col";
+    const height = Math.max(8, Math.round((item.total / maxValue) * 100));
+    col.innerHTML =
+      '<div class="chart-value">' + Math.round(item.total) + '</div>' +
+      '<div class="chart-bar-wrap"><div class="chart-bar" style="height:' + height + '%"></div></div>' +
+      '<div class="chart-label">' + escapeHtml(dayFmt.format(d).replace(".", "")) + '</div>';
+    chart.appendChild(col);
+  }
+
+  const recent = (rows || []).slice(0, 6);
+  const recentRoot = $("recentSalesList");
+  recentRoot.innerHTML = "";
+
+  if (!recent.length) {
+    recentRoot.innerHTML = '<div class="empty-state">Nu sunt vânzări în ultimele 7 zile.</div>';
+  } else {
+    recent.forEach(row => {
+      const item = document.createElement("div");
+      item.className = "recent-item";
+      item.innerHTML =
+        '<div class="recent-icon">🧾</div>' +
+        '<div class="recent-main">' +
+          '<strong>' + escapeHtml(row.product_code || "Produs") + '</strong>' +
+          '<span>' + escapeHtml(row.payment_method || "-") + ' • ' +
+            formatDateRO(row.created_at || row.sale_date) + '</span>' +
+        '</div>' +
+        '<div class="recent-amount">' + money(row.sale_price) + '</div>';
+      recentRoot.appendChild(item);
+    });
+  }
+}
+
 async function loadDashboard() {
-  const results = await Promise.all([
+  const now = new Date();
+  $("dashboardGreeting").textContent =
+    "Bun venit, " +
+    (currentAppUser?.display_name || currentAppUser?.username || "Admin");
+  $("dashboardDate").textContent =
+    new Intl.DateTimeFormat("ro-RO", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+      year: "numeric"
+    }).format(now);
+
+  const [
+    stockCount,
+    approvalCount
+  ] = await Promise.all([
     restCount("ams_products", "status=eq.In%20stoc"),
-    restCount("ams_sales"),
     restCount("ams_approval_requests", "status=eq.pending")
   ]);
 
-  $("stockCount").textContent = results[0];
-  $("salesCount").textContent = results[1];
-  $("approvalCount").textContent = results[2];
+  $("stockCount").textContent =
+    Number(stockCount || 0).toLocaleString("ro-RO");
+  $("approvalCount").textContent =
+    Number(approvalCount || 0).toLocaleString("ro-RO");
 
   const badge = $("approvalBadge");
-  badge.textContent = String(results[2]);
-  badge.classList.toggle("hidden", results[2] <= 0);
+  const n = Number(approvalCount || 0);
+  badge.textContent = String(n);
+  badge.classList.toggle("hidden", n <= 0);
+
+  await loadSalesDashboardData();
 }
 
 async function loadStock() {
@@ -505,6 +627,10 @@ $("logoutBtn").addEventListener("click", () => {
 
 $("refreshDashboardBtn").onclick = () => loadDashboard().catch(showMainError);
 $("enableNotificationsBtn").onclick = () => enablePushNotifications();
+$("openHistoryFromDashboard").onclick = async () => {
+  setPanel("historyPanel");
+  await loadHistory().catch(showMainError);
+};
 $("refreshStockBtn").onclick = () => loadStock().catch(showMainError);
 $("refreshApprovalsBtn").onclick = () => loadApprovals().catch(showMainError);
 $("refreshHistoryBtn").onclick = () => loadHistory().catch(showMainError);
