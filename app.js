@@ -471,6 +471,53 @@ async function loadSalesDashboardData() {
   }
 }
 
+async function loadDailyFinancials() {
+  const date = localISODate(new Date());
+  const fields = [
+    "cashTodayValue", "cardTodayValue", "otherTodayValue",
+    "grossMarginTodayValue", "grossMarginTodayPercent"
+  ];
+  fields.forEach(id => { $(id).textContent = "—"; });
+
+  try {
+    const result = await jsonFetch(
+      cfg.supabaseUrl + "/rest/v1/rpc/ams_mobile_daily_financials",
+      {
+        method: "POST",
+        headers: apiHeaders(true),
+        body: JSON.stringify({ p_sale_date: date })
+      }
+    );
+    $("cashTodayValue").textContent = money(result.cash_total);
+    $("cardTodayValue").textContent = money(result.card_total);
+    $("otherTodayValue").textContent = money(result.other_total);
+
+    const missing = Number(result.missing_cost_count || 0);
+    if (missing > 0 || result.gross_margin_estimate == null) {
+      $("grossMarginTodayValue").textContent = "Nedisponibil";
+      $("grossMarginTodayPercent").textContent = "—";
+      $("financialNote").textContent =
+        "Lipsește costul de achiziție pentru " + missing +
+        " produs(e) vândute. Marja nu este calculată incomplet.";
+    } else {
+      const margin = Number(result.gross_margin_estimate);
+      const sales = Number(result.sales_total || 0);
+      $("grossMarginTodayValue").textContent = money(margin);
+      $("grossMarginTodayPercent").textContent =
+        sales > 0 ? (margin / sales * 100).toLocaleString("ro-RO", {
+          maximumFractionDigits: 1
+        }) + "%" : "—";
+      $("financialNote").textContent =
+        "Estimare: vânzări minus costurile de achiziție curente. " +
+        "Nu scade TVA, comisioane, cheltuieli sau retururi.";
+    }
+  } catch (error) {
+    $("financialNote").textContent =
+      "Datele financiare nu s-au încărcat: " +
+      (error?.message || String(error));
+  }
+}
+
 async function loadDashboard() {
   const now = new Date();
   $("dashboardGreeting").textContent =
@@ -502,7 +549,10 @@ async function loadDashboard() {
   badge.textContent = String(n);
   badge.classList.toggle("hidden", n <= 0);
 
-  await loadSalesDashboardData();
+  await Promise.all([
+    loadSalesDashboardData(),
+    loadDailyFinancials()
+  ]);
 }
 
 async function loadStock() {
