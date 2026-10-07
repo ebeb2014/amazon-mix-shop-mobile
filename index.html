@@ -107,6 +107,51 @@
           <section class="dashboard-section">
             <div class="section-title-row">
               <div>
+                <div class="eyebrow">ANALIZĂ PERIOADĂ</div>
+                <h3>Vânzări pe interval</h3>
+              </div>
+            </div>
+
+            <div class="period-chips">
+              <button class="period-chip" data-days="0">Azi</button>
+              <button class="period-chip" data-days="1">Ieri</button>
+              <button class="period-chip active" data-days="4">4 zile</button>
+              <button class="period-chip" data-days="7">7 zile</button>
+              <button class="period-chip" data-days="30">30 zile</button>
+            </div>
+
+            <div class="period-range">
+              <label>
+                De la
+                <input id="periodFrom" type="date">
+              </label>
+              <label>
+                Până la
+                <input id="periodTo" type="date">
+              </label>
+              <button id="applyPeriodBtn" class="secondary-btn period-apply">Aplică</button>
+            </div>
+
+            <div class="period-summary">
+              <div>
+                <span>Total perioadă</span>
+                <strong id="periodSalesTotal">—</strong>
+              </div>
+              <div>
+                <span>Produse vândute</span>
+                <strong id="periodSalesCount">—</strong>
+              </div>
+              <div>
+                <span>Medie / zi</span>
+                <strong id="periodSalesAverage">—</strong>
+              </div>
+            </div>
+            <div id="periodLabel" class="period-label">—</div>
+          </section>
+
+          <section class="dashboard-section">
+            <div class="section-title-row">
+              <div>
                 <div class="eyebrow">ACTIVITATE</div>
                 <h3>Ultimele vânzări</h3>
               </div>
