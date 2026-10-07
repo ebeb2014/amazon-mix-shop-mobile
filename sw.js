@@ -1,4 +1,4 @@
-const CACHE = "ams-mobile-v8";
+const CACHE = "ams-mobile-v9";
 const ASSETS = ["./","./index.html","./styles.css","./app.js","./config.js","./manifest.webmanifest","./icon.svg"];
 
 self.addEventListener("install", event => {
