@@ -824,7 +824,29 @@ try {
 } catch (_) {}
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./sw.js", {
+        updateViaCache: "none"
+      });
+      await registration.update();
+    } catch (error) {
+      console.warn("Actualizarea aplicației nu a reușit:", error);
+    }
+  });
+
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) await registration.update();
+    } catch (_) {}
   });
 }
