@@ -1,0 +1,102 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f3f4f6;
+  color: #111827;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: #f3f4f6; }
+button, input { font: inherit; }
+.hidden { display: none !important; }
+.screen { min-height: 100vh; }
+.center-screen { display: grid; place-items: center; padding: 22px; }
+.card {
+  width: min(100%, 480px);
+  background: white;
+  border-radius: 22px;
+  padding: 24px;
+  box-shadow: 0 18px 60px rgba(0,0,0,.08);
+}
+.brand-row { display: flex; gap: 14px; align-items: center; margin-bottom: 24px; }
+.brand-row h1 { margin: 0; font-size: 24px; }
+.brand-row p { margin: 3px 0 0; color: #6b7280; }
+.brand-mark {
+  width: 54px; height: 54px; border-radius: 16px;
+  display: grid; place-items: center; font-weight: 800;
+  background: #111827; color: white;
+}
+label { display:block; margin: 14px 0 6px; font-weight: 650; }
+input {
+  width: 100%; border: 1px solid #d1d5db; border-radius: 13px;
+  padding: 13px 14px; background: #fff; outline: none;
+}
+input:focus { border-color: #111827; box-shadow: 0 0 0 3px rgba(17,24,39,.08); }
+.password-row { display:flex; gap:8px; }
+.icon-btn, .ghost-btn, .secondary-btn, .primary-btn {
+  border: 0; border-radius: 12px; cursor: pointer;
+}
+.icon-btn { min-width: 48px; background: #e5e7eb; }
+.primary-btn {
+  width:100%; margin-top:18px; padding:14px 16px;
+  background:#111827; color:white; font-weight:750;
+}
+.secondary-btn { padding: 11px 14px; background:#e5e7eb; color:#111827; }
+.ghost-btn { padding:9px 12px; background:#fff; border:1px solid #d1d5db; }
+.status { min-height: 22px; margin-top: 10px; font-size: 14px; }
+.hint { color:#6b7280; font-size:13px; line-height:1.45; margin-top:16px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 4;
+  display:flex; justify-content:space-between; align-items:center;
+  padding: max(14px, env(safe-area-inset-top)) 18px 14px;
+  background:#111827; color:white;
+}
+.small-label { font-size:12px; color:#9ca3af; margin-bottom:3px; }
+main { padding: 18px 16px 96px; max-width: 840px; margin:0 auto; }
+.panel { display:none; }
+.panel.active { display:block; }
+.panel h2 { margin: 4px 0 14px; }
+.panel-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.grid-cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.metric-card {
+  background:#fff; border-radius:18px; padding:18px;
+  box-shadow:0 5px 24px rgba(0,0,0,.05);
+}
+.metric-card span { display:block; color:#6b7280; font-size:13px; margin-bottom:6px; }
+.metric-card strong { font-size:28px; }
+.metric-card.alert { grid-column: span 2; }
+.list { display:grid; gap:10px; margin-top:14px; }
+.list-item {
+  background:white; border-radius:15px; padding:14px;
+  box-shadow:0 4px 18px rgba(0,0,0,.045);
+}
+.list-title { font-weight:750; }
+.list-meta { margin-top:5px; color:#6b7280; font-size:13px; line-height:1.4; }
+.approval-actions { display:flex; gap:8px; margin-top:12px; }
+.approve-btn, .reject-btn {
+  flex:1; padding:11px; border:0; border-radius:11px; font-weight:700; cursor:pointer;
+}
+.approve-btn { background:#dcfce7; color:#166534; }
+.reject-btn { background:#fee2e2; color:#991b1b; }
+
+.bottom-nav {
+  position:fixed; left:0; right:0; bottom:0; z-index:6;
+  display:grid; grid-template-columns:repeat(4,1fr);
+  padding:8px 8px max(8px, env(safe-area-inset-bottom));
+  background:#fff; border-top:1px solid #e5e7eb;
+}
+.nav-btn {
+  position:relative; background:transparent; border:0; padding:8px 4px;
+  display:grid; gap:2px; place-items:center; color:#6b7280;
+}
+.nav-btn span { font-size:11px; }
+.nav-btn.active { color:#111827; font-weight:700; }
+.badge {
+  position:absolute; top:2px; right:18%;
+  min-width:18px; height:18px; border-radius:99px;
+  background:#dc2626; color:white; font-size:11px;
+  display:grid; place-items:center; padding:0 5px;
+}
+@media (min-width: 700px) {
+  .grid-cards { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .metric-card.alert { grid-column:auto; }
+}
