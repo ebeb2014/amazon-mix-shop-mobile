@@ -337,3 +337,81 @@ main { padding: 18px 16px 96px; max-width: 840px; margin:0 auto; }
   .kpi-card { padding:14px; }
   .kpi-card strong { font-size:21px; }
 }
+
+
+/* Sales period selector */
+.period-chips {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding:14px 0 4px;
+  scrollbar-width:none;
+}
+.period-chips::-webkit-scrollbar { display:none; }
+.period-chip {
+  flex:0 0 auto;
+  border:1px solid #e5e7eb;
+  background:#f8fafc;
+  color:#374151;
+  border-radius:999px;
+  padding:9px 13px;
+  font-size:12px;
+  font-weight:750;
+}
+.period-chip.active {
+  background:#111827;
+  color:#fff;
+  border-color:#111827;
+}
+.period-range {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+.period-range label {
+  margin:0;
+  color:#6b7280;
+  font-size:11px;
+  font-weight:700;
+}
+.period-range input {
+  margin-top:5px;
+  padding:10px 11px;
+  border-radius:11px;
+  font-size:13px;
+}
+.period-apply {
+  grid-column:1 / -1;
+  width:100%;
+}
+.period-summary {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  margin-top:13px;
+}
+.period-summary > div {
+  background:#f8fafc;
+  border-radius:14px;
+  padding:12px 10px;
+  min-width:0;
+}
+.period-summary span {
+  display:block;
+  color:#9ca3af;
+  font-size:10px;
+  margin-bottom:5px;
+}
+.period-summary strong {
+  display:block;
+  font-size:13px;
+  line-height:1.25;
+  word-break:break-word;
+}
+.period-label {
+  margin-top:10px;
+  color:#6b7280;
+  font-size:12px;
+  text-align:center;
+}
