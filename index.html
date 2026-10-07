@@ -54,23 +54,68 @@
 
       <main>
         <section id="dashboardPanel" class="panel active">
-          <h2>Dashboard</h2>
-          <div class="grid-cards">
-            <article class="metric-card">
-              <span>Produse în stoc</span>
+          <div class="hero-card">
+            <div>
+              <div class="eyebrow">PANOU ADMINISTRATOR</div>
+              <h2 id="dashboardGreeting">Bun venit</h2>
+              <div id="dashboardDate" class="hero-date">—</div>
+            </div>
+            <button id="refreshDashboardBtn" class="icon-refresh" aria-label="Actualizează">↻</button>
+          </div>
+
+          <div class="kpi-grid">
+            <article class="kpi-card kpi-primary">
+              <div class="kpi-icon">💰</div>
+              <div class="kpi-label">Vânzări azi</div>
+              <strong id="salesTodayValue">—</strong>
+              <small id="salesTodayCount">—</small>
+            </article>
+
+            <article class="kpi-card">
+              <div class="kpi-icon">🕘</div>
+              <div class="kpi-label">Vânzări ieri</div>
+              <strong id="salesYesterdayValue">—</strong>
+              <small id="salesYesterdayCount">—</small>
+            </article>
+
+            <article class="kpi-card">
+              <div class="kpi-icon">📦</div>
+              <div class="kpi-label">Produse în stoc</div>
               <strong id="stockCount">—</strong>
+              <small>disponibile acum</small>
             </article>
-            <article class="metric-card">
-              <span>Vânzări înregistrate</span>
-              <strong id="salesCount">—</strong>
-            </article>
-            <article class="metric-card alert">
-              <span>Aprobări în așteptare</span>
+
+            <article class="kpi-card kpi-warning">
+              <div class="kpi-icon">✅</div>
+              <div class="kpi-label">Aprobări</div>
               <strong id="approvalCount">—</strong>
+              <small>în așteptare</small>
             </article>
           </div>
+
+          <section class="dashboard-section">
+            <div class="section-title-row">
+              <div>
+                <div class="eyebrow">ULTIMELE 7 ZILE</div>
+                <h3>Ritm vânzări</h3>
+              </div>
+              <strong id="weekSalesTotal">—</strong>
+            </div>
+            <div id="salesWeekChart" class="mini-chart"></div>
+          </section>
+
+          <section class="dashboard-section">
+            <div class="section-title-row">
+              <div>
+                <div class="eyebrow">ACTIVITATE</div>
+                <h3>Ultimele vânzări</h3>
+              </div>
+              <button id="openHistoryFromDashboard" class="text-btn">Vezi toate</button>
+            </div>
+            <div id="recentSalesList" class="recent-list"></div>
+          </section>
+
           <div class="dashboard-actions">
-            <button id="refreshDashboardBtn" class="secondary-btn">Actualizează</button>
             <button id="enableNotificationsBtn" class="primary-btn compact-btn">🔔 Activează notificările</button>
           </div>
           <div id="pushStatus" class="push-status"></div>
