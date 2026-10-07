@@ -154,28 +154,52 @@ async function loadDashboard() {
 
 async function loadStock() {
   const q = $("stockSearch").value.trim();
-  let query =
-    "select=product_code,name,ean,lot_code,sale_price,status,updated_at" +
-    "&status=eq.In%20stoc&order=updated_at.desc&limit=100";
+  const pageSize = 500;
+  let offset = 0;
+  let data = [];
 
-  if (q) {
-    const safe = q.replace(/[%_,]/g, "");
-    const orFilter =
-      "(product_code.ilike.*" + safe +
-      "*,name.ilike.*" + safe +
-      "*,ean.ilike.*" + safe +
-      "*,lot_code.ilike.*" + safe + "*)";
-    query += "&or=" + encodeURIComponent(orFilter);
+  while (true) {
+    let query =
+      "select=product_code,name,ean,lot_code,sale_price,status,updated_at" +
+      "&status=eq.In%20stoc&order=updated_at.desc" +
+      "&limit=" + pageSize +
+      "&offset=" + offset;
+
+    if (q) {
+      const safe = q.replace(/[%_,]/g, "");
+      const orFilter =
+        "(product_code.ilike.*" + safe +
+        "*,name.ilike.*" + safe +
+        "*,ean.ilike.*" + safe +
+        "*,lot_code.ilike.*" + safe + "*)";
+      query += "&or=" + encodeURIComponent(orFilter);
+    }
+
+    const page = await restSelect("ams_products", query);
+    if (!Array.isArray(page) || page.length === 0) break;
+
+    data = data.concat(page);
+
+    if (page.length < pageSize) break;
+    offset += page.length;
   }
 
-  const data = await restSelect("ams_products", query);
   const root = $("stockList");
   root.innerHTML = "";
 
-  if (!data?.length) {
+  if (!data.length) {
     root.innerHTML = '<div class="list-item">Nu am găsit produse.</div>';
     return;
   }
+
+  const summary = document.createElement("div");
+  summary.className = "list-item";
+  summary.innerHTML =
+    '<div class="list-title">Produse afișate: ' + data.length + '</div>' +
+    '<div class="list-meta">Lista conține tot stocul găsit pentru filtrul curent.</div>';
+  root.appendChild(summary);
+
+  const fragment = document.createDocumentFragment();
 
   data.forEach(row => {
     const el = document.createElement("article");
@@ -187,8 +211,10 @@ async function loadStock() {
       'EAN: ' + escapeHtml(row.ean || "-") + ' • Lot: ' + escapeHtml(row.lot_code || "-") + '<br>' +
       'Preț: ' + Number(row.sale_price || 0).toFixed(2) + ' lei' +
       '</div>';
-    root.appendChild(el);
+    fragment.appendChild(el);
   });
+
+  root.appendChild(fragment);
 }
 
 async function loadHistory() {
