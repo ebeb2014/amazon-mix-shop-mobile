@@ -475,7 +475,7 @@ async function loadDailyFinancials() {
   const date = localISODate(new Date());
   const fields = [
     "cashTodayValue", "cardTodayValue", "otherTodayValue",
-    "grossMarginTodayValue", "grossMarginTodayPercent"
+    "purchaseCostTodayValue", "grossMarginTodayValue", "grossMarginTodayPercent"
   ];
   fields.forEach(id => { $(id).textContent = "—"; });
 
@@ -493,6 +493,8 @@ async function loadDailyFinancials() {
     $("otherTodayValue").textContent = money(result.other_total);
 
     const missing = Number(result.missing_cost_count || 0);
+    $("purchaseCostTodayValue").textContent =
+      missing > 0 ? "Cost incomplet" : money(result.purchase_total);
     if (missing > 0 || result.gross_margin_estimate == null) {
       $("grossMarginTodayValue").textContent = "Nedisponibil";
       $("grossMarginTodayPercent").textContent = "—";
