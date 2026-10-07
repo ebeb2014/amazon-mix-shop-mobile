@@ -311,6 +311,87 @@ function prettyDateOnly(value) {
   }).format(d);
 }
 
+let marginDetailsOpen = false;
+let marginProductsOffset = 0;
+let marginProductsRequestId = 0;
+
+async function loadProductMargins(reset=true) {
+  if (!marginDetailsOpen) return;
+  const from = $("periodFrom").value;
+  const to = $("periodTo").value;
+  if (!from || !to || from > to) return;
+
+  const requestId = ++marginProductsRequestId;
+  if (reset) {
+    marginProductsOffset = 0;
+    $("marginProductsList").innerHTML = "";
+  }
+  $("marginProductsSummary").textContent = "Se încarcă...";
+  $("marginProductsMoreBtn").classList.add("hidden");
+
+  try {
+    const data = await jsonFetch(
+      cfg.supabaseUrl + "/rest/v1/rpc/ams_mobile_product_margins",
+      {
+        method: "POST",
+        headers: apiHeaders(true),
+        body: JSON.stringify({
+          p_from: from,
+          p_to: to,
+          p_limit: 100,
+          p_offset: marginProductsOffset
+        })
+      }
+    );
+    if (requestId !== marginProductsRequestId) return;
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    const count = Number(data.total_count || 0);
+    const losses = Number(data.loss_count || 0);
+    const missing = Number(data.missing_cost_count || 0);
+
+    $("marginProductsSummary").textContent =
+      count + " produse vândute • " + losses + " în pierdere" +
+      (missing ? " • " + missing + " fără cost" : "");
+
+    const fragment = document.createDocumentFragment();
+    for (const row of rows) {
+      const costMissing = row.purchase_price == null;
+      const margin = costMissing ? null : Number(row.margin);
+      const isLoss = margin !== null && margin < 0;
+      const item = document.createElement("article");
+      item.className = "margin-product" + (isLoss ? " margin-product-loss" : "");
+      item.innerHTML =
+        '<div class="margin-product-top"><strong>' +
+        escapeHtml(row.name || row.product_code || "Produs") +
+        '</strong><span class="margin-product-result' +
+        (isLoss ? ' negative' : '') + '">' +
+        (costMissing ? "Cost lipsă" : (isLoss ? "Pierdere: " : "Marjă: ") + money(margin)) +
+        '</span></div>' +
+        '<div class="margin-product-code">' +
+        escapeHtml(row.product_code || "-") + ' • ' +
+        escapeHtml(prettyDateOnly(row.sale_date || "")) + '</div>' +
+        '<div class="margin-product-values"><span>Achiziție: <b>' +
+        (costMissing ? "—" : money(row.purchase_price)) +
+        '</b></span><span>Vânzare: <b>' +
+        money(row.sale_price) + '</b></span></div>';
+      fragment.appendChild(item);
+    }
+    $("marginProductsList").appendChild(fragment);
+    marginProductsOffset += rows.length;
+    $("marginProductsMoreBtn").classList.toggle("hidden",
+      marginProductsOffset >= count || rows.length === 0);
+
+    if (!count) {
+      $("marginProductsList").innerHTML =
+        '<div class="empty-state">Nu sunt produse vândute în perioada aleasă.</div>';
+    }
+  } catch (error) {
+    if (requestId !== marginProductsRequestId) return;
+    $("marginProductsSummary").textContent =
+      "Nu am putut încărca detaliile: " + (error?.message || String(error));
+  }
+}
+
 async function loadPeriodSales(fromISO, toISO) {
   if (!fromISO || !toISO) return;
 
@@ -348,6 +429,7 @@ async function loadPeriodSales(fromISO, toISO) {
   $("periodSalesAverage").textContent = money(average);
   $("periodLabel").textContent =
     prettyDateOnly(fromISO) + " – " + prettyDateOnly(toISO);
+  if (marginDetailsOpen) await loadProductMargins(true);
 }
 
 function setQuickPeriod(days) {
@@ -769,6 +851,14 @@ $("logoutBtn").addEventListener("click", () => {
 
 $("refreshDashboardBtn").onclick = () => loadDashboard().catch(showMainError);
 $("enableNotificationsBtn").onclick = () => enablePushNotifications();
+$("toggleProductMarginsBtn").onclick = async () => {
+  marginDetailsOpen = !marginDetailsOpen;
+  $("productMarginsPanel").classList.toggle("hidden", !marginDetailsOpen);
+  $("toggleProductMarginsBtn").setAttribute("aria-expanded", String(marginDetailsOpen));
+  $("marginToggleArrow").textContent = marginDetailsOpen ? "⌃" : "⌄";
+  if (marginDetailsOpen) await loadProductMargins(true);
+};
+$("marginProductsMoreBtn").onclick = () => loadProductMargins(false);
 $("openHistoryFromDashboard").onclick = async () => {
   setPanel("historyPanel");
   await loadHistory().catch(showMainError);
