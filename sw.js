@@ -1,5 +1,5 @@
-const CACHE = "ams-mobile-v9";
-const ASSETS = ["./","./index.html","./styles.css","./app.js","./config.js","./manifest.webmanifest","./icon.svg"];
+const CACHE = "ams-mobile-v10";
+const ASSETS = ["./","./index.html","./styles.css?v=10","./app.js?v=10","./config.js","./manifest.webmanifest","./icon.svg"];
 
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
@@ -21,7 +21,7 @@ self.addEventListener("fetch", event => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(req).then(resp => {
+    fetch(req, { cache: "no-store" }).then(resp => {
       const copy = resp.clone();
       caches.open(CACHE).then(cache => cache.put(req, copy));
       return resp;
