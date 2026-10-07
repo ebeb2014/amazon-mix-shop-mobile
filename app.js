@@ -294,6 +294,95 @@ function money(value) {
   }) + " lei";
 }
 
+
+function dateShift(baseDate, days) {
+  const d = new Date(baseDate);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function prettyDateOnly(value) {
+  const d = new Date(value + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return value;
+  return new Intl.DateTimeFormat("ro-RO", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(d);
+}
+
+async function loadPeriodSales(fromISO, toISO) {
+  if (!fromISO || !toISO) return;
+
+  const fromDate = new Date(fromISO + "T12:00:00");
+  const toDate = new Date(toISO + "T12:00:00");
+
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    throw new Error("Interval de dată invalid.");
+  }
+
+  if (fromDate > toDate) {
+    throw new Error("Data «De la» nu poate fi după data «Până la».");
+  }
+
+  const rows = await restSelect(
+    "ams_sales",
+    "select=id,sale_price,sale_date,payment_method,product_code" +
+    "&sale_date=gte." + encodeURIComponent(fromISO) +
+    "&sale_date=lte." + encodeURIComponent(toISO) +
+    "&order=id.desc"
+  );
+
+  const total = (rows || []).reduce(
+    (sum, row) => sum + Number(row.sale_price || 0),
+    0
+  );
+  const count = (rows || []).length;
+  const days =
+    Math.floor((toDate - fromDate) / 86400000) + 1;
+  const average = days > 0 ? total / days : 0;
+
+  $("periodSalesTotal").textContent = money(total);
+  $("periodSalesCount").textContent =
+    Number(count).toLocaleString("ro-RO");
+  $("periodSalesAverage").textContent = money(average);
+  $("periodLabel").textContent =
+    prettyDateOnly(fromISO) + " – " + prettyDateOnly(toISO);
+}
+
+function setQuickPeriod(days) {
+  const today = new Date();
+  let from;
+  let to;
+
+  if (days === 0) {
+    from = today;
+    to = today;
+  } else if (days === 1) {
+    const yesterday = dateShift(today, -1);
+    from = yesterday;
+    to = yesterday;
+  } else {
+    to = today;
+    from = dateShift(today, -(days - 1));
+  }
+
+  const fromISO = localISODate(from);
+  const toISO = localISODate(to);
+
+  $("periodFrom").value = fromISO;
+  $("periodTo").value = toISO;
+
+  document.querySelectorAll(".period-chip").forEach(btn => {
+    btn.classList.toggle(
+      "active",
+      Number(btn.dataset.days) === Number(days)
+    );
+  });
+
+  return loadPeriodSales(fromISO, toISO);
+}
+
 async function loadSalesDashboardData() {
   const today = new Date();
   const yesterday = new Date(today);
@@ -576,6 +665,7 @@ async function enterApp() {
   loginView.classList.add("hidden");
   mainView.classList.remove("hidden");
   await Promise.all([loadDashboard(), loadApprovals()]);
+  await setQuickPeriod(4).catch(showMainError);
   await refreshPushUi();
 
   const params = new URLSearchParams(window.location.search);
@@ -630,6 +720,22 @@ $("enableNotificationsBtn").onclick = () => enablePushNotifications();
 $("openHistoryFromDashboard").onclick = async () => {
   setPanel("historyPanel");
   await loadHistory().catch(showMainError);
+};
+
+document.querySelectorAll(".period-chip").forEach(btn => {
+  btn.onclick = () => {
+    setQuickPeriod(Number(btn.dataset.days)).catch(showMainError);
+  };
+});
+
+$("applyPeriodBtn").onclick = () => {
+  document.querySelectorAll(".period-chip").forEach(btn => {
+    btn.classList.remove("active");
+  });
+  loadPeriodSales(
+    $("periodFrom").value,
+    $("periodTo").value
+  ).catch(showMainError);
 };
 $("refreshStockBtn").onclick = () => loadStock().catch(showMainError);
 $("refreshApprovalsBtn").onclick = () => loadApprovals().catch(showMainError);
