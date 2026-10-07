@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Amazon Mix Shop">
+  <title>Amazon Mix Shop Mobile</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app">
+    <section id="loginView" class="screen center-screen">
+      <div class="card login-card">
+        <div class="brand-row">
+          <div class="brand-mark">AMS</div>
+          <div>
+            <h1>Amazon Mix Shop</h1>
+            <p>Mobile Admin</p>
+          </div>
+        </div>
+
+        <label>Email administrator</label>
+        <input id="emailInput" type="email" autocomplete="username" placeholder="email">
+
+        <label>Parolă</label>
+        <div class="password-row">
+          <input id="passwordInput" type="password" autocomplete="current-password" placeholder="parolă">
+          <button id="togglePasswordBtn" class="icon-btn" type="button">👁</button>
+        </div>
+
+        <button id="loginBtn" class="primary-btn">Conectează-te</button>
+        <div id="loginStatus" class="status"></div>
+
+        <p class="hint">
+          Prima versiune mobilă folosește autentificarea de Administrator.
+          Username-ul „admin” îl legăm în pasul următor, fără să publicăm emailul în cod.
+        </p>
+      </div>
+    </section>
+
+    <section id="mainView" class="screen hidden">
+      <header class="topbar">
+        <div>
+          <div class="small-label">Amazon Mix Shop</div>
+          <strong id="userLabel">Administrator</strong>
+        </div>
+        <button id="logoutBtn" class="ghost-btn">Ieșire</button>
+      </header>
+
+      <main>
+        <section id="dashboardPanel" class="panel active">
+          <h2>Dashboard</h2>
+          <div class="grid-cards">
+            <article class="metric-card">
+              <span>Produse în stoc</span>
+              <strong id="stockCount">—</strong>
+            </article>
+            <article class="metric-card">
+              <span>Vânzări înregistrate</span>
+              <strong id="salesCount">—</strong>
+            </article>
+            <article class="metric-card alert">
+              <span>Aprobări în așteptare</span>
+              <strong id="approvalCount">—</strong>
+            </article>
+          </div>
+          <button id="refreshDashboardBtn" class="secondary-btn">Actualizează</button>
+        </section>
+
+        <section id="stockPanel" class="panel">
+          <div class="panel-head">
+            <h2>Stoc</h2>
+            <button id="refreshStockBtn" class="ghost-btn">Actualizează</button>
+          </div>
+          <input id="stockSearch" type="search" placeholder="Caută cod, produs, EAN, lot...">
+          <div id="stockList" class="list"></div>
+        </section>
+
+        <section id="approvalsPanel" class="panel">
+          <div class="panel-head">
+            <h2>Aprobări</h2>
+            <button id="refreshApprovalsBtn" class="ghost-btn">Actualizează</button>
+          </div>
+          <div id="approvalList" class="list"></div>
+        </section>
+
+        <section id="historyPanel" class="panel">
+          <div class="panel-head">
+            <h2>Istoric vânzări</h2>
+            <button id="refreshHistoryBtn" class="ghost-btn">Actualizează</button>
+          </div>
+          <div id="historyList" class="list"></div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav">
+        <button data-panel="dashboardPanel" class="nav-btn active">🏠<span>Acasă</span></button>
+        <button data-panel="stockPanel" class="nav-btn">📦<span>Stoc</span></button>
+        <button data-panel="approvalsPanel" class="nav-btn">✅<span>Aprobări</span><b id="approvalBadge" class="badge hidden">0</b></button>
+        <button data-panel="historyPanel" class="nav-btn">🧾<span>Istoric</span></button>
+      </nav>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
