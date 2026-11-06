@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Amazon Mix Shop • Vânzări</title>
+<style>
+:root{font-family:system-ui,Arial,sans-serif;color:#172033;background:#f4f6fa}*{box-sizing:border-box}body{margin:0}
+main{max-width:780px;margin:auto;padding:20px}h1{font-size:23px}h2{font-size:18px}
+.card{background:#fff;border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0001}
+input,button{padding:12px;border:1px solid #c9d0db;border-radius:9px;font:inherit}input{width:100%;margin:6px 0}
+button{background:#173d91;color:white;border:0;cursor:pointer}button.secondary{background:#eef1f7;color:#172033}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}
+.hidden{display:none!important}.muted{color:#657186;font-size:13px}.metric{font-size:21px;font-weight:bold}
+.sale{border-top:1px solid #e7e9ef;padding:12px 0}.sale:first-child{border-top:0}
+.price{font-weight:700;color:#173d91}.err{color:#b51b29;white-space:pre-wrap}
+</style></head><body><main>
+<header class="row"><h1>Amazon Mix Shop • Vânzări</h1><button id="logout" class="secondary hidden">Ieșire</button></header>
+<section id="login" class="card"><h2>Acces vizualizare vânzări</h2>
+<p class="muted">Cont separat. Nu folosi parola administratorului.</p>
+<label>Email<input id="email" type="email" autocomplete="username"></label>
+<label>Parolă<input id="password" type="password" autocomplete="current-password"></label>
+<button id="signin">Conectează-te</button></section>
+<section id="dashboard" class="hidden">
+<div class="card"><div class="row"><label>De la<input id="from" type="date"></label><label>Până la<input id="to" type="date"></label></div>
+<button id="refresh">Actualizează</button></div>
+<div class="card"><div class="row"><div><div class="muted">Total vânzări</div><div id="total" class="metric">—</div></div>
+<div><div class="muted">Produse vândute</div><div id="count" class="metric">—</div></div></div>
+<div class="row"><div>Cash: <strong id="cash">—</strong></div><div>Card: <strong id="card">—</strong></div></div></div>
+<div class="card"><h2>Produse vândute</h2><p class="muted">Denumire, cantitate, preț, data/ora și operator.</p>
+<div id="sales"></div><button id="more" class="secondary hidden">Încarcă mai multe</button></div></section>
+<p id="status" role="status"></p></main>
+<script src="./config.js"></script><script src="./viewer.js"></script></body></html>
