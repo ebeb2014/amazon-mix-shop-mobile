@@ -13,6 +13,14 @@ async function api(path,options={}){
   if(!r.ok)throw new Error(v?.message||v?.error_description||("HTTP "+r.status));
   return v;
 }
+async function signUp(){
+  const email=$("email").value.trim().toLowerCase(),password=$("password").value;
+  if(email!=="kiki.daiu10@gmail.com")throw new Error("Această invitație este doar pentru kiki.daiu10@gmail.com.");
+  if(password.length<12)throw new Error("Alege o parolă nouă de minimum 12 caractere.");
+  await api("/auth/v1/signup",{method:"POST",body:JSON.stringify({email,password})});
+  $("password").value="";
+  msg("Cererea de înregistrare a fost trimisă. Verifică inboxul și confirmă adresa, apoi conectează-te.");
+}
 async function signIn(){
   const email=$("email").value.trim(),password=$("password").value;
   if(!email||!password)throw new Error("Completează emailul și parola contului de vizualizare.");
@@ -51,6 +59,7 @@ async function load(reset){
   msg("");
 }
 $("signin").onclick=()=>signIn().catch(e=>msg(e.message,true));
+$("signup").onclick=()=>signUp().catch(e=>msg(e.message,true));
 $("refresh").onclick=()=>load(true).catch(e=>msg(e.message,true));
 $("more").onclick=()=>load(false).catch(e=>msg(e.message,true));
 $("logout").onclick=()=>{token=null;offset=0;$("dashboard").classList.add("hidden");$("login").classList.remove("hidden");$("logout").classList.add("hidden");$("sales").replaceChildren();msg("");};
