@@ -1,0 +1,51 @@
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.ams_app_users where active and is_primary_admin order by created_at limit 1),true);
+set local role authenticated;
+do $$
+declare a jsonb;b jsonb;c jsonb;ids jsonb;sid uuid:=gen_random_uuid(); oid uuid:=gen_random_uuid(); other uuid:=gen_random_uuid(); snap jsonb; saved jsonb; staff uuid; uid uuid:=auth.uid(); denied boolean;
+begin
+ select jsonb_agg(jsonb_build_object('id',id::text,'price',100)) into ids from(select id from public.ams_products where owner_id=public.ams_current_owner_id() and status='In stoc' and coalesce(reservation_code,'')='' order by id limit 2) x;
+ if jsonb_array_length(ids)<>2 then raise exception 'Need two available units';end if;
+ a:=public.ams_live_api('save',jsonb_build_object('id',oid,'items',ids,'customer',jsonb_build_object('name','TEST ROLLBACK','phone','0700000000','city','București','address','TEST'),'shipping',20,'advance',30));
+ if (a->>'goods_total')::numeric<>200 then raise exception 'Wrong multi-unit sum';end if;
+ b:=public.ams_live_api('reserve',jsonb_build_object('id',oid,'revision',a->'revision'));
+ if (select count(*) from public.ams_products where reservation_code='LIVE:'||oid::text)<>2 then raise exception 'Reservation failed';end if;
+ begin
+ perform public.ams_live_api('cancel',jsonb_build_object('id',oid,'revision',a->'revision'));raise exception 'Stale update accepted';
+ exception when serialization_failure then null;end;
+ denied:=false;
+ begin perform public.ams_live_api('save',jsonb_build_object('id',other,'items',ids,'customer',jsonb_build_object('name','TEST'),'delivery','ridicare'));exception when raise_exception then denied:=true;end;
+ if not denied then raise exception 'Double allocation accepted';end if;
+ select jsonb_build_object('receipt_code','TEST-LIVE-'||oid::text,'sale_date',current_date,'payment_method','Cash','total',200,'subtotal',200,'discount',0,'client','TEST ROLLBACK','customer','{}'::jsonb,'common_note','TEST ROLLBACK','items',jsonb_agg(jsonb_build_object('product_code',v->>'code','name',v->>'name','sale_price',100,'vat_rate',v->'vat_rate','live_order_id',oid)),'discounted_prices','[100,100]'::jsonb) into snap from jsonb_array_elements(b->'items') v;
+ c:=public.ams_live_api('checkout_prepare',jsonb_build_object('id',oid,'snapshot',snap));
+ if c->>'status'<>'reserved' then raise exception 'Transfer failed';end if;
+ c:=public.ams_live_api('checkout_release',jsonb_build_object('receipt_code',snap->>'receipt_code','reason','TEST BONOK0'));
+ if (select count(*) from public.ams_products where reservation_code='LIVE:'||oid::text)<>2 then raise exception 'Release lost Live hold';end if;
+ c:=public.ams_live_api('checkout_prepare',jsonb_build_object('id',oid,'snapshot',snap));
+ denied:=false;
+ begin perform public.ams_live_api('checkout_commit',jsonb_build_object('id',oid,'snapshot',snap,'fiscal_status','error'));exception when raise_exception then denied:=true;end;
+ if not denied then raise exception 'Missing fiscal OK accepted';end if;
+ saved:=public.ams_live_api('checkout_commit',jsonb_build_object('id',oid,'snapshot',snap,'fiscal_status','ok','fiscal_number','TEST','response_text','BONOK=1'));
+ if saved->>'status'<>'saved' then raise exception 'Atomic sale not saved';end if;
+ saved:=public.ams_live_api('checkout_commit',jsonb_build_object('id',oid,'snapshot',snap,'fiscal_status','ok','fiscal_number','TEST','response_text','BONOK=1'));
+ if saved->>'status'<>'already_saved' then raise exception 'Duplicate sale not idempotent';end if;
+ if (select count(*) from public.ams_products where id in (select (x->>'id')::bigint from jsonb_array_elements(ids) x) and status='Vândut')<>2 then raise exception 'Stock not sold';end if;
+ b:=public.ams_live_api('get',jsonb_build_object('id',oid));
+ c:=public.ams_live_api('fulfill',jsonb_build_object('id',oid,'revision',b->'revision','fulfillment','shipped','courier','TEST','awb','TEST'));
+ if c->>'fulfillment'<>'shipped' then raise exception 'Shipping not saved';end if;
+ select user_id into staff from public.ams_app_users where owner_id=public.ams_current_owner_id() and active and not is_primary_admin limit 1;
+ if staff is not null then
+ perform public.ams_live_api('member',jsonb_build_object('user_id',staff,'role','viewer'));
+ perform set_config('request.jwt.claim.sub',staff::text,true);
+ if jsonb_array_length(public.ams_live_api('list'))<1 then raise exception 'Viewer cannot read';end if;
+ begin perform public.ams_live_api('reserve',jsonb_build_object('id',oid,'revision',c->'revision'));raise exception 'Viewer can reserve';exception when insufficient_privilege then null;end;
+ perform set_config('request.jwt.claim.sub',uid::text,true);
+ end if;
+ perform set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ if exists(select 1 from public.ams_live_orders) then raise exception 'Cross-store read allowed';end if;
+ begin perform public.ams_live_api('list');raise exception 'Unknown account API access';exception when insufficient_privilege then null;end;
+end $$;
+set local role anon;
+do $$ begin begin perform public.ams_live_api('list');raise exception 'Anonymous access';exception when insufficient_privilege then null;end;end $$;
+rollback;
+select 'PASS multi-unit totals, real holds, stale conflict, double allocation, POS transfer, failed fiscal release, BONOK gate, atomic sale, idempotency, shipping, roles, RLS; all writes rolled back' result;

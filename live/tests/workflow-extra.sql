@@ -1,0 +1,34 @@
+begin;
+select set_config('request.jwt.claim.sub',(select user_id::text from public.ams_app_users where active and is_primary_admin order by created_at limit 1),true);
+set local role authenticated;
+do $$ declare p jsonb; a jsonb; b jsonb; uid uuid:=auth.uid(); oid uuid:=gen_random_uuid(); staff uuid; denied boolean;
+begin
+p:=public.ams_live_api('catalog')->0;
+if p is null then raise exception 'No unit';end if;
+perform public.ams_live_api('product_save',jsonb_build_object('id',p->>'id','revision',p->'detail_revision','short_code','QA-'||left(oid::text,8),'condition','testat','notes','TEST ROLLBACK','photos','[]'::jsonb));
+b:=public.ams_live_api('product',jsonb_build_object('id',p->>'id'))->0;
+if b->>'condition'<>'testat' then raise exception 'Product metadata missing';end if;
+begin perform public.ams_live_api('product_save',jsonb_build_object('id',p->>'id','revision',p->'detail_revision','photos','[]'::jsonb));raise exception 'Stale details saved';exception when serialization_failure then null;end;
+denied:=false;
+begin perform public.ams_live_api('product_save',jsonb_build_object('id',p->>'id','revision',b->'detail_revision','photos',jsonb_build_array('other-owner/1/secret.jpg')));exception when raise_exception then denied:=true;end;
+if not denied then raise exception 'Foreign photo accepted';end if;
+select jsonb_build_object('id',id::text,'price',100) into p from public.ams_products where owner_id=public.ams_current_owner_id() and status='In stoc' and coalesce(reservation_code,'')='' order by id limit 1;
+a:=public.ams_live_api('save',jsonb_build_object('id',oid,'customer',jsonb_build_object('name','Test','phone','0700000000'),'items',jsonb_build_array(p)));
+a:=public.ams_live_api('reserve',jsonb_build_object('id',oid,'revision',a->'revision'));
+a:=public.ams_live_api('contact',jsonb_build_object('id',oid,'revision',a->'revision','customer',jsonb_build_object('name','Test','phone','0700000000','city','București','address','TEST')));
+if a#>>'{customer,address}'<>'TEST' then raise exception 'Address not updated';end if;
+denied:=false;
+begin perform public.ams_live_api('fulfill',jsonb_build_object('id',oid,'revision',a->'revision','fulfillment','shipped','courier','TEST','awb','TEST'));exception when raise_exception then denied:=true;end;
+if not denied then raise exception 'Shipment without fiscal sale accepted';end if;
+a:=public.ams_live_api('cancel',jsonb_build_object('id',oid,'revision',a->'revision'));
+if exists(select 1 from public.ams_products where reservation_code='LIVE:'||oid::text) then raise exception 'Cancel leaked hold';end if;
+select user_id into staff from public.ams_app_users where owner_id=public.ams_current_owner_id() and active and not is_primary_admin limit 1;
+if staff is not null then
+ perform public.ams_live_api('member',jsonb_build_object('user_id',staff,'role','packer'));
+ perform set_config('request.jwt.claim.sub',staff::text,true);
+ begin perform public.ams_live_api('member',jsonb_build_object('user_id',staff,'role','manager'));raise exception 'Packer escalated role';exception when insufficient_privilege then null;end;
+ begin perform public.ams_live_api('contact',jsonb_build_object('id',oid,'revision',a->'revision'));raise exception 'Packer changed customer';exception when insufficient_privilege then null;end;
+end if;
+end $$;
+rollback;
+select 'PASS product conditions, short codes, stale edits, photo ownership, address after reserve, fiscal shipping gate, cancel release, packer permissions; rolled back' result;

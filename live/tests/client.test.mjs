@@ -26,11 +26,11 @@ test('a pending order response cannot repopulate private data after sign-out',as
     return nodes.get(id);
   };
   const events={};let resolveLoad;
-  const window={amsBackend:{ready:false,load:()=>new Promise(resolve=>{resolveLoad=resolve;})},addEventListener:(name,fn)=>{events[name]=fn;}};
-  runInNewContext(await readFile(new URL('app.js',root),'utf8'),{window,document:{getElementById:node,addEventListener(){},querySelectorAll:()=>[]},navigator:{onLine:true},location:{hash:'#comenzi'},Intl,URL,crypto,structuredClone});
+  const window={amsBackend:{ready:false,call:(action)=>action==='list'?new Promise(resolve=>{resolveLoad=resolve;}):Promise.resolve([])},addEventListener:(name,fn)=>{events[name]=fn;}};
+  runInNewContext(await readFile(new URL('app.js',root),'utf8'),{window,document:{getElementById:node,addEventListener(){},querySelectorAll:()=>[]},navigator:{onLine:true},location:{hash:'#comenzi'},Intl,URL,crypto,structuredClone,setInterval(){}});
   window.amsBackend.ready=true;events['ams:signed-in']();
   window.amsBackend.ready=false;events['ams:signed-out']();
-  resolveLoad({revision:3,state:{products:[{id:'p',name:'Private product',total:1}],orders:[],lives:[]}});
+  resolveLoad([{id:'private',customer:{name:'Private customer'}}]);
   await new Promise(setImmediate);
   assert.equal(node('content').innerHTML,'');assert.equal(node('metrics').innerHTML,'');
 });

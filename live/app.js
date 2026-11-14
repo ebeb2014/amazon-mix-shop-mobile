@@ -1,236 +1,99 @@
-(function client(){
-const $ = id => document.getElementById(id);
-const status = ['nouă','de verificat','pregătită','expediată','livrată','retur','anulată'];
-const confirmed = o => ['pregătită','expediată','livrată','retur'].includes(o.status) && !(o.status==='retur' && o.restocked);
-const active = o => !['retur','anulată'].includes(o.status);
-const cash = n => Intl.NumberFormat('ro-RO',{style:'currency',currency:'RON'}).format(n);
-const sum = (rows,field) => rows.reduce((n,o)=>n+o[field],0);
-const esc = v => String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const cap = s => s[0].toUpperCase()+s.slice(1);
-const today = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Bucharest'}).format(new Date());
-const normal = s => s.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'');
-let state, revision, edit, busy=false, authEpoch=0;
-let query='', statusFilter='', liveFilter='';
-const find = (list,id) => state[list].find(x=>x.id===id);
-const reserved = id => state.orders.filter(o=>o.product===id&&confirmed(o)).reduce((n,o)=>n+o.qty,0);
-const available = p => p.total-reserved(p.id);
-const button = (label,action,id='',primary=false) => `<button type="button" data-action="${action}" data-id="${esc(id)}"${primary?' class="primary"':''}>${label}</button>`;
-const options = (items,value) => items.map(([key,label])=>`<option value="${esc(key)}"${key===value?' selected':''}>${esc(label)}</option>`).join('');
-const badge = s => `<span class="badge" data-status="${s}">${cap(s)}</span>`;
-const info = (label,value) => `<div class="metric"><small>${label}</small><strong>${value}</strong></div>`;
-function announce(message='',error=false){
-  $('notice').textContent=message;
-  $('notice').hidden=!message;
-  $('notice').classList.toggle('error',error);
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id), h=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=v=>new Intl.NumberFormat('ro-RO',{style:'currency',currency:'RON'}).format(Number(v)||0);
+const states={draft:'Ciornă',reserved:'Rezervată',checkout:'La casa de marcat',paid:'Fiscalizată',cancelled:'Anulată'};
+const stages={new:'De pregătit',packing:'În pregătire',packed:'Împachetată',shipped:'Expediată',delivered:'Livrată',return:'Retur de verificat'};
+const roles={manager:'Administrator Live',operator:'Operator comenzi',packer:'Pregătire colete',viewer:'Doar vizualizare',disabled:'Fără acces Live'};
+let orders=[],products=[],sessions=[],cart=[],epoch=0,modalEpoch=0,query='',limit=40,offset=0,more=false,saveHandler=null,loading=false;
+const page=()=>location.hash.slice(1)||'comenzi',me=()=>window.amsBackend?.identity||{};
+const canEdit=()=>['manager','operator'].includes(me().role),canPack=()=>['manager','operator','packer'].includes(me().role);
+function notice(message,error=false){$('notice').textContent=message;$('notice').hidden=!message;$('notice').classList.toggle('error',error);}
+async function api(action,data={}){const e=epoch;if(!navigator.onLine)throw new Error('Conectează telefonul la internet.');const r=await window.amsBackend.call(action,data);if(e!==epoch||!window.amsBackend.ready)throw new Error('Sesiunea s-a închis.');return r;}
+async function run(fn){try{await fn();}catch(error){if(window.amsBackend?.ready)notice(error.message,true);}}
+const btn=(label,action,id='',cls='')=>`<button type="button" class="${h(cls)}" data-action="${h(action)}" data-id="${h(id)}">${h(label)}</button>`;
+const field=(name,label,value='',type='text',extra='')=>`<label>${h(label)}<input name="${h(name)}" type="${type}" value="${h(value)}" ${extra}></label>`;
+const select=(name,label,values,value)=>`<label>${h(label)}<select name="${name}">${Object.entries(values).map(([v,t])=>`<option value="${h(v)}" ${v===value?'selected':''}>${h(t)}</option>`).join('')}</select></label>`;
+function form(title,html,save=null,label='Salvează'){
+ modalEpoch++;saveHandler=save;$('dialog-title').textContent=title;$('fields').innerHTML=html;$('fields').oninput=null;$('form-error').hidden=true;
+ const submit=$('editor').querySelector('[type=submit]');submit.hidden=!save;submit.textContent=label;submit.disabled=false;$('cancel').textContent=save?'Renunță':'Închide';
+ if(!$('modal').open)$('modal').showModal();
 }
-async function api(method='GET',data){
-  return method==='GET'?window.amsBackend.load():window.amsBackend.save(data);
+function close(){modalEpoch++;saveHandler=null;$('modal').close();$('fields').replaceChildren();}
+$('close').addEventListener('click',close);$('cancel').addEventListener('click',close);$('modal').addEventListener('cancel',close);
+$('editor').addEventListener('submit',async ev=>{
+ ev.preventDefault();if(!saveHandler)return;const save=saveHandler,token=modalEpoch,e=epoch,submit=$('editor').querySelector('[type=submit]');submit.disabled=true;$('form-error').hidden=true;
+ try{await save(new FormData($('editor')));if(e===epoch&&token===modalEpoch)close();}
+ catch(error){if(e===epoch&&token===modalEpoch){$('form-error').textContent=error.message;$('form-error').hidden=false;}}
+ finally{submit.disabled=false;}
+});
+async function loadCatalog(){let all=[],after=0;for(let i=0;i<100;i++){const rows=await api('catalog',{after});all.push(...rows);if(rows.length<1000){products=all;return;}after=Number(rows.at(-1).id);}throw new Error('Catalog prea mare.');}
+async function refresh(){
+ if(!window.amsBackend?.ready||loading)return;const e=epoch;loading=true;
+ try{const [rows,ss]=await Promise.all([api('list',{offset:0}),api('sessions')]);if(e!==epoch)return;orders=rows;sessions=ss;offset=rows.length;more=rows.length===100;await loadCatalog();if(e===epoch)render();}
+ catch(error){if(e===epoch)notice(error.message,true);}finally{if(e===epoch)loading=false;}
 }
-async function load(){
-  if(!window.amsBackend?.ready)return;
-  const epoch=authEpoch;
-  try {
-    const result=await api();
-    if(epoch!==authEpoch)return;
-    ({state,revision}=result);
-    announce();
-    render();
-  } catch(e){
-    announce(e.message,true);
-    $('content').innerHTML=button('Reîncearcă','reload');
-  }
-}
-async function save(next){
-  if(busy)return false;
-  if(!navigator.onLine){announce('Nu ai internet. Reconectează-te înainte să salvezi.',true);return false;}
-  const epoch=authEpoch;
-  busy=true;
-  $('editor').querySelector('[type=submit]').disabled=true;
-  try{
-    const result=await api('PUT',{revision,state:next});
-    if(epoch!==authEpoch)return false;
-    ({revision}=result);
-    state=next;
-    render();
-    announce('Modificările au fost salvate.');
-    return true;
-  }catch(e){
-    if($('modal').open){
-      $('form-error').textContent=e.message;
-      $('form-error').hidden=false;
-    }else announce(e.message,true);
-    return false;
-  }finally{
-    busy=false;
-    $('editor').querySelector('[type=submit]').disabled=false;
-  }
-}
-function empty(icon,title,description,action=''){
-  return `<div class="empty"><span aria-hidden="true">${icon}</span><h2>${title}</h2><p class="muted">${description}</p>${action}</div>`;
-}
-function table(headers,rows){
-  return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>`<th scope="col">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map((cell,i)=>`<td data-label="${headers[i]}">${cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-}
+function metrics(){const active=orders.filter(o=>['reserved','checkout'].includes(o.status));$('metrics').innerHTML=[['Rezervări active',active.length],['Bucăți rezervate',active.reduce((s,o)=>s+o.items.length,0)],['De pregătit',orders.filter(o=>['reserved','paid'].includes(o.status)&&['new','packing'].includes(o.fulfillment)).length],['Valoare rezervată',money(active.reduce((s,o)=>s+Number(o.goods_total),0))]].map(([label,value])=>`<article class="metric"><span>${h(label)}</span><strong>${h(value)}</strong></article>`).join('');}
 function render(){
-  if(!state)return;
-  const page=location.hash.slice(1);
-  const current=['stoc','live','magazin'].includes(page)?page:'comenzi';
-  document.querySelectorAll('nav a').forEach(a=>{
-    if(a.hash==='#'+current)a.setAttribute('aria-current','page');
-    else a.removeAttribute('aria-current');
-  });
-  if(current==='magazin'){window.amsCatalog.open();return;}
-  const meta={
-    comenzi:['Comenzi','Urmărește comenzile primite în timpul live-urilor.','+ Comandă nouă','order'],
-    stoc:['Stoc manual','Produse introduse în acest panou. Confirmările de aici nu rezervă stocul magazinului.','+ Produs nou','product'],
-    live:['Sesiuni Live','Vezi comenzile și încasările pe fiecare sesiune.','+ Live nou','live']
-  }[current];
-  $('title').textContent=meta[0];
-  $('subtitle').textContent=meta[1];
-  $('actions').innerHTML=button(meta[2],meta[3],'',true);
-  if(current==='comenzi'){
-    const orders=state.orders.filter(o=>(!liveFilter||o.live===liveFilter)&&(!statusFilter||o.status===statusFilter));
-    $('metrics').innerHTML=info('Comenzi',orders.length)+info('De verificat',orders.filter(o=>o.status==='de verificat').length)+info('Pregătite',orders.filter(o=>o.status==='pregătită').length)+info('De încasat',cash(sum(orders.filter(o=>active(o)&&o.status!=='livrată'),'amount')));
-    $('content').innerHTML=`<div class="panel"><div class="bar"><h2>Lista comenzilor</h2><div class="filters"><input id="query" type="search" aria-label="Caută comenzi" placeholder="Caută client, telefon, produs…" value="${esc(query)}"><select id="status-filter" aria-label="Status">${options([['','Toate statusurile'],...status.map(s=>[s,cap(s)])],statusFilter)}</select><select id="live-filter" aria-label="Sesiune Live">${options([['','Toate sesiunile'],...state.lives.map(l=>[l.id,l.name])],liveFilter)}</select></div></div><div id="orders"></div></div>`;
-    $('query').addEventListener('input',e=>{query=e.target.value;renderOrders();});
-    $('status-filter').addEventListener('change',e=>{statusFilter=e.target.value;render();$('status-filter').focus();});
-    $('live-filter').addEventListener('change',e=>{liveFilter=e.target.value;render();$('live-filter').focus();});
-    renderOrders();
-  }else if(current==='stoc'){
-    $('metrics').innerHTML=info('Produse',state.products.length)+info('Unități disponibile',state.products.reduce((n,p)=>n+available(p),0))+info('Stoc epuizat',state.products.filter(p=>available(p)===0).length);
-    $('content').innerHTML=`<div class="panel"><div class="bar"><h2>Inventar</h2></div>${state.products.length?table(['Produs','Disponibil','Alocat comenzilor','Acțiuni'],state.products.map(p=>[
-      `<strong>${esc(p.name)}</strong>`,`<strong>${available(p)}</strong> buc.`,reserved(p.id)+' buc.',button('Corectează stocul','product',p.id)
-    ])):empty('◇','Adaugă primul produs','Introdu numele produsului și cantitatea disponibilă.',button('Adaugă produs','product','',true))}</div>`;
-  }else{
-    $('metrics').innerHTML=info('Sesiuni Live',state.lives.length)+info('Comenzi din live-uri',state.orders.filter(o=>o.live).length);
-    $('content').innerHTML=state.lives.length?`<div class="live-grid">${[...state.lives].sort((a,b)=>b.date.localeCompare(a.date)).map(l=>{
-      const rows=state.orders.filter(o=>o.live===l.id);
-      const currentRows=rows.filter(active);
-      return `<article class="live-card"><h2>${esc(l.name)}</h2><p class="muted">${esc(l.date.split('-').reverse().join('.'))}</p>${l.notes?`<p class="hint">${esc(l.notes)}</p>`:''}<div class="live-stats"><div>Comenzi<strong>${rows.length}</strong></div><div>De încasat<strong>${cash(sum(currentRows.filter(o=>o.status!=='livrată'),'amount'))}</strong></div><div>Avansuri active<strong>${cash(sum(currentRows,'advance'))}</strong></div><div>Curier comenzi active<strong>${cash(sum(currentRows,'courier'))}</strong></div></div><div class="chips">${status.filter(s=>rows.some(o=>o.status===s)).map(s=>`<span class="badge" data-status="${s}">${cap(s)} · ${rows.filter(o=>o.status===s).length}</span>`).join('')}</div><div class="row-actions">${button('Vezi comenzi','live-orders',l.id)}${button('Comandă nouă','live-order',l.id)}${button('Duplică','duplicate-live',l.id)}${button('Editează','live',l.id)}</div></article>`;
-    }).join('')}</div>`:`<div class="panel">${empty('◉','Pregătește primul live','Adaugă o sesiune pentru a grupa comenzile primite în acel live.',button('Adaugă sesiune','live','',true))}</div>`;
-  }
+ if(!window.amsBackend?.ready)return;const p=page();document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash===location.hash));
+ const titles={comenzi:['Comenzi online','Rezervări, bonuri și livrări, într-un singur loc.'],live:['Mod Live','Alege fiecare bucată, apoi rezervă comanda clientului.'],magazin:['Produse și poze','Stocul magazinului, cu starea și fotografia fiecărei bucăți.'],colete:['Pregătire colete','Verifică produsele, adresa și AWB-ul.'],echipa:['Echipa magazinului','Conturi separate și drepturi pentru fiecare coleg.'],arhiva:['Arhivă manuală','Comenzile vechi sunt păstrate separat de rezervările reale.']};
+ $('metrics').hidden=['live','magazin','echipa','arhiva'].includes(p);const [title,sub]=titles[p]||titles.comenzi;$('title').textContent=title;$('subtitle').textContent=sub;$('actions').innerHTML=btn('Actualizează','refresh')+(canEdit()?btn('Comandă nouă','new','','primary'):'');metrics();
+ if(p==='live'||p==='magazin'){renderCatalog();return;}if(p==='echipa'){run(showTeam);return;}if(p==='arhiva'){run(showLegacy);return;}
+ const rows=p==='colete'?orders.filter(o=>['reserved','checkout','paid'].includes(o.status)&&o.fulfillment!=='delivered'):orders;
+ $('content').innerHTML=`<div class="tools"><input id="order-search" placeholder="Caută client, telefon, număr sau AWB" aria-label="Caută comenzi"><select id="order-status" aria-label="Filtrează starea"><option value="">Toate stările</option>${Object.entries(states).map(([s,t])=>`<option value="${s}">${t}</option>`).join('')}</select></div><div id="order-list" class="order-grid"></div>${more?btn('Încarcă următoarele 100','more'):''}<p class="hint">Rezumatul include cele ${orders.length} comenzi încărcate. Returul fiscal se face în aplicația de magazin.</p>`;
+ const show=()=>{const q=$('order-search').value.toLocaleLowerCase('ro'),st=$('order-status').value;const filtered=rows.filter(o=>(!st||o.status===st)&&[o.number,o.customer.name,o.customer.phone,o.awb].some(v=>String(v||'').toLocaleLowerCase('ro').includes(q)));$('order-list').innerHTML=filtered.length?filtered.map(orderCard).join(''):'<div class="empty"><h2>Nicio comandă aici</h2><p>Începe din Mod Live, selectând produsele clientului.</p></div>';};
+ $('order-search').addEventListener('input',show);$('order-status').addEventListener('change',show);show();
 }
-function renderOrders(){
-  const rows=state.orders.filter(o=>(!liveFilter||o.live===liveFilter)&&(!statusFilter||o.status===statusFilter)&&normal([o.customer,o.phone,o.city,find('products',o.product)?.name].join(' ')).includes(normal(query.trim())));
-  $('orders').innerHTML=rows.length?table(['Client','Produs','Livrare','De încasat','Status','Acțiuni'],rows.map(o=>[
-    `<strong>${esc(o.customer)}</strong><small><a href="tel:${esc(o.phone.replace(/[^+0-9]/g,''))}">${esc(o.phone)}</a> · ${esc(o.city)}</small>`,
-    `<strong>${esc(find('products',o.product)?.name)}</strong><small>${o.qty} buc.${o.live?' · '+esc(find('lives',o.live)?.name):''}</small>`,
-    `${esc(o.delivery)}<small>Curier ${cash(o.courier)}</small>`,`${cash(o.amount)}<small>Avans ${cash(o.advance)}</small>`,badge(o.status),
-    `<div class="row-actions">${['nouă','de verificat'].includes(o.status)?button('Confirmă','confirm',o.id,true):''}${button('Editează','order',o.id)}${button('Duplică','duplicate-order',o.id)}${o.status==='retur'&&!o.restocked?button('Reintră în stoc','restock',o.id):''}</div>`
-  ])):empty('▤',state.orders.length?'Nicio comandă găsită':'Încă nu ai comenzi',state.orders.length?'Schimbă căutarea sau filtrele pentru a vedea alte comenzi.':'Adaugă prima comandă primită pe TikTok Live.',state.orders.length?'':button('Adaugă comandă','order','',true));
+function orderCard(o){return `<article class="order-card"><div class="row"><span class="badge ${h(o.status)}">${h(states[o.status])}</span><strong>#${h(o.number)}</strong></div><h2>${h(o.customer.name)}</h2><p>${o.items.length} bucăți · ${h(money(Number(o.goods_total)+Number(o.shipping)))}</p><p class="muted">${h(o.delivery==='ridicare'?'Ridicare magazin':o.customer.city)} · ${h(stages[o.fulfillment])}</p><div class="row">${btn('Deschide comanda','order',o.id)}<small>${h(new Date(o.created_at).toLocaleDateString('ro-RO'))}</small></div></article>`;}
+function renderCatalog(){
+ const live=page()==='live';if(live&&canEdit())$('actions').innerHTML=btn('Sesiune nouă','session-new')+btn('Actualizează','refresh');
+ $('content').innerHTML=`<div class="tools"><input id="product-search" placeholder="Nume, EAN, cod sau număr Live" aria-label="Caută produse" value="${h(query)}">${btn('Scanează','scan')}<label class="inline"><input id="available-only" type="checkbox" checked> Doar disponibile</label></div>${live?`<div class="live-bar"><div><b>${cart.length} bucăți selectate</b><small>${h(money(cart.reduce((s,p)=>s+Number(p.price),0)))}</small></div>${canEdit()?btn('Date client →','new','','primary'):''}</div>`:''}<div id="product-list" class="product-grid"></div><div id="product-more"></div>`;
+ const show=()=>{query=$('product-search').value;const q=query.trim().toLocaleLowerCase('ro');const rows=products.filter(p=>(!$('available-only').checked||p.available)&&[p.name,p.code,p.ean,p.short_code].some(v=>String(v||'').toLocaleLowerCase('ro').includes(q)));$('product-list').innerHTML=rows.slice(0,limit).map(p=>`<article class="product-card"><div class="row"><span class="product-code">${h(p.short_code?'LIVE '+p.short_code:p.code)}</span><span class="badge ${p.available?'available':''}">${p.available?'Disponibil':'Rezervat'}</span></div><h2>${h(p.name)}</h2><p>${h(p.condition)}${p.photos.length?' · '+p.photos.length+' poze':''}</p><strong>${h(money(p.price))}</strong><small>Cod: ${h(p.code)} · EAN: ${h(p.ean||'—')}</small><div class="row">${btn('Detalii / poze','product',p.id)}${canEdit()&&p.available?btn(cart.some(x=>x.id===p.id)?'Elimină':'Adaugă','add',p.id,cart.some(x=>x.id===p.id)?'selected':'primary'):''}</div></article>`).join('')||'<p class="empty">Nu am găsit produse disponibile pentru această căutare.</p>';$('product-more').innerHTML=rows.length>limit?btn(`Mai multe (${rows.length} rezultate)`,'products-more'):'';};
+ $('product-search').addEventListener('input',()=>{limit=40;show();});$('available-only').addEventListener('change',show);show();
 }
-const field=(label,name,value='',type='text',attrs='')=>`<label>${label}<input name="${name}" value="${esc(value)}" type="${type}" ${attrs}></label>`;
-const select=(label,name,items,value)=>`<label>${label}<select name="${name}">${options(items,value)}</select></label>`;
-const notes=(value='')=>`<label class="wide">Observații<textarea name="notes" rows="2" maxlength="1500">${esc(value)}</textarea></label>`;
-function open(type,id='',mode=''){
-  const list={order:'orders',product:'products',live:'lives'}[type];
-  const old=find(list,id);
-  if(type==='order'&&!state.products.length){
-    announce('Adaugă întâi produsul în stoc. După salvare se deschide formularul comenzii.');
-    open('product','','order-next');
-    return;
-  }
-  edit={type,list,id:mode==='duplicate'?'':id,mode};
-  let markup;
-  if(type==='order'){
-    const copy=mode==='duplicate';
-    const o=old??{};
-    $('dialog-title').textContent=copy?'Duplică modelul de comandă':old?'Editează comanda':'Comandă nouă';
-    markup=select('Produs','product',state.products.map(p=>[p.id,p.name+' · '+available(p)+' disponibile']),o.product)
-      +field('Cantitate','qty',o.qty??1,'number','required min="1" step="1"')
-      +field('Client','customer',copy?'':o.customer,'text','required maxlength="150"')
-      +field('Telefon','phone',copy?'':o.phone,'tel','required maxlength="35"')
-      +field('Localitate','city',copy?'':o.city,'text','required maxlength="120"')
-      +select('Metodă de livrare','delivery',[
-        ['GLS','Curier GLS'],
-        ...(!copy&&o.delivery==='Curier'?[['Curier','Curier (nespecificat)']]:[]),
-        ['Ridicare din magazin','Ridicare din magazin'],
-        ['Altă metodă','Altă metodă']
-      ],copy&&o.delivery==='Curier'?'GLS':o.delivery??'GLS')
-      +field('Cost curier (lei)','courier',o.courier??0,'number','required min="0" step="0.01"')
-      +field('Sumă rămasă de încasat (lei)','amount',o.amount??0,'number','required min="0" step="0.01"')
-      +field('Avans primit (lei)','advance',copy?0:o.advance??0,'number','required min="0" step="0.01"')
-      +select('Status','status',status.map(s=>[s,cap(s)]),copy?'nouă':o.status??'nouă')
-      +select('Sesiune Live','live',[['','Fără sesiune'],...state.lives.map(l=>[l.id,l.name])],o.live??liveFilter)
-      +(o.restocked&&!copy?'<p class="wide hint">Returul a fost repus în stoc.</p>':'')+notes(copy?'':o.notes);
-  }else if(type==='product'){
-    $('dialog-title').textContent=old?'Corectează stocul':'Produs nou';
-    markup=field('Nume produs','name',old?.name,'text','required maxlength="150"')+field('Cantitate disponibilă','available',old?available(old):0,'number','required min="0" step="1"');
-    if(old)markup+='<p class="wide hint">Introdu câte bucăți sunt acum disponibile la vânzare.</p>';
-  }else{
-    const copy=mode==='duplicate';
-    $('dialog-title').textContent=copy?'Duplică sesiunea Live':old?'Editează sesiunea':'Live nou';
-    markup=field('Nume sesiune','name',copy?old.name+' – copie':old?.name,'text','required maxlength="150"')+field('Data','date',copy?today():old?.date??today(),'date','required')+notes(old?.notes);
-  }
-  $('fields').innerHTML=`<div class="fields-grid">${markup}</div>`;
-  $('form-error').hidden=true;
-  $('modal').showModal();
+function editOrder(o=null){
+ if(!canEdit())return;const selected=o?o.items.map(x=>({...x,id:String(x.id)})):cart.map(x=>({...x}));if(!selected.length){location.hash='#live';notice('Adaugă produsele clientului din stoc.');render();return;}
+ const c=o?.customer||{},id=o?.id||crypto.randomUUID();
+ form(o?'Editează comanda #'+o.number:'Comandă nouă · '+selected.length+' bucăți',`<p class="hint">Fiecare rând este o bucată fizică. Prețul poate include reducerea convenită la live.</p><div class="order-lines">${selected.map(p=>`<div class="line"><span><b>${h(p.name)}</b><small>${h(p.code)}</small></span>${field('price_'+p.id,'Preț final / bucată',p.price,'number','min="0.01" max="1000000" step="0.01" required')}</div>`).join('')}</div><div class="form-grid">${field('name','Nume client',c.name,'text','required maxlength="160"')}${field('phone','Telefon',c.phone,'tel','required maxlength="30"')}${field('city','Localitate',c.city,'text','maxlength="100"')}${field('county','Județ / sector',c.county,'text','maxlength="100"')}${field('address','Adresă completă',c.address,'text','maxlength="500"')}${field('postal','Cod poștal',c.postal,'text','maxlength="20"')}${select('delivery','Livrare',{curier:'Curier',ridicare:'Ridicare magazin'},o?.delivery||'curier')}${select('session_id','Sesiune Live',{'':'Fără sesiune',...Object.fromEntries(sessions.map(s=>[s.id,s.name]))},o?.session_id||'')}${field('shipping','Transport separat (lei)',o?.shipping||0,'number','min="0" max="1000000" step="0.01" required')}${field('advance','Avans înregistrat (lei)',o?.advance||0,'number','min="0" max="100000000" step="0.01" required')}</div><label>Observații<textarea name="notes" maxlength="3000">${h(o?.notes||'')}</textarea></label><p id="order-total" class="total"></p><p class="hint">Transportul și avansul sunt evidențiate pentru comandă. La casă se verifică documentele și încasările aferente.</p>${select('save_mode','După salvare',{reserve:'Rezervă bucățile în stoc',draft:'Păstrează ciornă, fără rezervare'},'reserve')}`,async fd=>{
+  const payload={id,revision:o?.revision||0,items:selected.map(p=>({id:p.id,price:Number(fd.get('price_'+p.id))})),customer:Object.fromEntries(['name','phone','city','county','address','postal'].map(k=>[k,String(fd.get(k)||'').trim()])),shipping:Number(fd.get('shipping')),advance:Number(fd.get('advance')),delivery:fd.get('delivery'),session_id:fd.get('session_id'),notes:fd.get('notes')};
+  let saved=await api('save',payload);cart=[];
+  if(fd.get('save_mode')==='reserve'){try{saved=await api('reserve',{id,revision:saved.revision});}catch(error){close();location.hash='#comenzi';await refresh();notice('Ciorna a fost salvată, dar rezervarea a eșuat: '+error.message,true);return;}}
+  notice(saved.status==='reserved'?'Comanda este rezervată în stoc.':'Ciornă salvată.');location.hash='#comenzi';await refresh();
+ },'Salvează comanda');
+ const totals=()=>{const fd=new FormData($('editor'));const goods=selected.reduce((s,p)=>s+Number(fd.get('price_'+p.id)||0),0),sum=goods+Number(fd.get('shipping')||0);$('order-total').textContent=`Total: ${money(sum)} · Rest de încasat: ${money(sum-Number(fd.get('advance')||0))}`;};$('fields').oninput=totals;totals();
 }
-document.addEventListener('click',async e=>{
-  const b=e.target.closest('button[data-action]');
-  if(!b||busy)return;
-  const {action,id}=b.dataset;
-  if(action==='reload')return load();
-  if(action==='live-orders'){
-    liveFilter=id;statusFilter='';query='';
-    location.hash='comenzi';
-    return render();
-  }
-  if(action==='live-order'){
-    liveFilter=id;
-    return open('order');
-  }
-  if(action==='confirm'||action==='restock'){
-    const next=structuredClone(state);
-    const o=next.orders.find(row=>row.id===id);
-    if(action==='confirm'){
-      if(available(find('products',o.product))<o.qty)return announce('Stoc insuficient pentru confirmarea acestei comenzi.',true);
-      o.status='pregătită';
-    }else{
-      if(o.restocked)return;
-      o.restocked=true;
-    }
-    return save(next);
-  }
-  if(action.startsWith('duplicate-'))return open(action.slice(10),id,'duplicate');
-  open(action,id);
-});
-$('editor').addEventListener('submit',async e=>{
-  e.preventDefault();
-  if(busy)return;
-  const values=Object.fromEntries(new FormData(e.target));
-  const {type,list,id,mode}=edit;
-  const old=find(list,id);
-  const row={...old,...values,id:id||crypto.randomUUID()};
-  if(type==='order'){
-    for(const key of ['qty','courier','amount','advance'])row[key]=Number(row[key]);
-    for(const key of ['customer','phone','city'])row[key]=row[key].trim();
-    if(row.status!=='retur')row.restocked=false;
-    const p=find('products',row.product);
-    const freed=old?.product===row.product&&confirmed(old)?old.qty:0;
-    if(confirmed(row)&&row.qty>available(p)+freed){
-      $('form-error').textContent='Stoc insuficient pentru cantitatea selectată.';
-      $('form-error').hidden=false;
-      return;
-    }
-  }else{
-    row.name=row.name.trim();
-    if(type==='product'){
-      row.total=Number(row.available)+reserved(row.id);
-      delete row.available;
-    }
-  }
-  const next=structuredClone(state);
-  next[list]=id?next[list].map(item=>item.id===id?row:item):[row,...next[list]];
-  if(await save(next)){
-    $('modal').close();
-    if(mode==='order-next')open('order');
-  }
-});
-for(const id of ['cancel','close'])$(id).addEventListener('click',()=>{if(!busy)$('modal').close();});
-$('modal').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
-window.addEventListener('hashchange',render);
-window.addEventListener('ams:signed-in',()=>{authEpoch++;load();});
-window.addEventListener('ams:signed-out',()=>{authEpoch++;state=null;revision=0;edit=null;busy=false;$('modal').close();$('content').replaceChildren();$('metrics').replaceChildren();$('fields').replaceChildren();announce();});
-if(window.amsBackend?.ready)load();
+async function openOrder(id){const o=await api('get',{id}),c=o.customer;
+ form('Comanda #'+o.number,`<div class="row"><span class="badge ${h(o.status)}">${h(states[o.status])}</span><b>${h(stages[o.fulfillment])}</b></div><h3>${h(c.name)}</h3><p>${h(c.phone)}<br>${h([c.address,c.city,c.county,c.postal].filter(Boolean).join(', '))}</p><p>${o.delivery==='ridicare'?'Ridicare din magazin':'Livrare prin curier'}${o.courier?' · '+h(o.courier):''}${o.awb?' · AWB '+h(o.awb):''}</p><div class="order-lines">${o.items.map(p=>`<div class="line"><span><b>${h(p.name)}</b><small>${h(p.code)} · 1 bucată</small>${btn('Verifică produsul','product',p.id)}</span><b>${h(money(p.price))}</b></div>`).join('')}</div><div class="totals"><p>Produse <b>${h(money(o.goods_total))}</b></p><p>Transport <b>${h(money(o.shipping))}</b></p><p>Avans <b>${h(money(o.advance))}</b></p><p class="total">Rest de încasat <b>${h(money(Number(o.goods_total)+Number(o.shipping)-Number(o.advance)))}</b></p></div>${o.receipt_code?`<p>Bon: ${h(o.receipt_code)} · Nr. fiscal: ${h(o.fiscal_number||'în așteptare')}</p>`:''}<p>${h(o.notes)}</p><div class="detail-actions">${canEdit()&&o.status==='draft'?btn('Editează / rezervă','edit',id):''}${canEdit()&&['draft','reserved'].includes(o.status)?btn('Date client / adresă','contact',id):''}${canEdit()&&['draft','reserved'].includes(o.status)?btn('Anulează comanda','cancel-order',id):''}${canPack()&&['reserved','checkout','paid'].includes(o.status)?btn('Pregătire / AWB','packing',id):''}${btn('Listă pentru colet','print',id)}${btn('Copiază adresa','address',id)}${btn('Jurnal modificări','audit',id)}</div><p class="hint">${o.status==='reserved'?'Pe calculator: Vânzări → Comenzi online → Preia în bon. Produsele rămân rezervate până la confirmarea fiscală.':o.fulfillment==='return'?'Returul se verifică și se stornează la casă. Acest marcaj nu repune automat produsele în stoc.':''}</p>`);
+}
+async function productDetails(id){const p=(await api('product',{id}))[0];if(!p)throw new Error('Produsul nu mai este disponibil.');const editable=canEdit();let paths=[...p.photos];
+ form(p.name,`<p>Cod ${h(p.code)} · ${h(money(p.price))}</p><div id="photo-gallery" class="photo-gallery"></div><div class="form-grid">${field('short_code','Număr scurt pentru Live',p.short_code,'text','maxlength="20" '+(!editable?'disabled':''))}${select('condition','Starea acestei bucăți',Object.fromEntries(['neverificat','nou','testat','resigilat','ambalaj deteriorat','accesorii lipsă','defect'].map(v=>[v,v])),p.condition)}</div><label>Detalii / accesorii<textarea name="notes" maxlength="2000" ${!editable?'disabled':''}>${h(p.condition_notes)}</textarea></label>${editable?'<label>Adaugă fotografie (maximum 8)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment"></label><p class="hint">Fotografia se încarcă la salvare. Fiecare poză aparține acestei bucăți.</p>':''}`,editable?async fd=>{
+  const file=fd.get('photo');if(file?.size){if(paths.length>=8)throw new Error('Sunt deja 8 fotografii.');paths.push(await window.amsBackend.upload(id,file));}
+  await api('product_save',{id,revision:p.detail_revision,short_code:fd.get('short_code'),condition:fd.get('condition'),notes:fd.get('notes'),photos:paths});await refresh();notice('Detaliile produsului au fost salvate.');
+ }:null);
+ const e=epoch,m=modalEpoch,urls=await window.amsBackend.photos(paths);if(e===epoch&&m===modalEpoch)$('photo-gallery').innerHTML=urls.map(url=>`<img src="${h(url)}" alt="Fotografia produsului ${h(p.code)}">`).join('')||'<p class="hint">Nicio fotografie pentru această bucată.</p>';
+}
+async function contact(id){const o=await api('get',{id}),c=o.customer;form('Date client · comanda #'+o.number,`<div class="form-grid">${field('name','Nume client',c.name,'text','required maxlength="160"')}${field('phone','Telefon',c.phone,'tel','required maxlength="30"')}${field('city','Localitate',c.city,'text','maxlength="100"')}${field('county','Județ / sector',c.county,'text','maxlength="100"')}${field('address','Adresă completă',c.address,'text','maxlength="500"')}${field('postal','Cod poștal',c.postal,'text','maxlength="20"')}</div>`,async fd=>{await api('contact',{id,revision:o.revision,customer:Object.fromEntries(['name','phone','city','county','address','postal'].map(k=>[k,String(fd.get(k)||'').trim()]))});await refresh();notice('Datele clientului au fost actualizate.');});}
+async function packing(id){const o=await api('get',{id});form('Colet · comanda #'+o.number,`${select('fulfillment','Stare colet',stages,o.fulfillment)}${field('courier','Curier',o.courier,'text','maxlength="100"')}${field('awb','AWB',o.awb,'text','maxlength="100"')}<p class="hint">AWB-ul se introduce după crearea lui la curier. Expedierea este disponibilă după finalizarea bonului. Marcarea unui retur nu modifică stocul.</p>`,async fd=>{await api('fulfill',{id,revision:o.revision,fulfillment:fd.get('fulfillment'),courier:fd.get('courier'),awb:fd.get('awb')});await refresh();notice('Colet actualizat.');});}
+async function showTeam(){const e=epoch;if(me().role!=='manager'){$('content').innerHTML=`<p class="empty">Rolul tău: ${h(roles[me().role])}. Administratorul Live gestionează accesul colegilor.</p>`;return;}const rows=await api('team');if(e!==epoch||page()!=='echipa')return;
+ $('content').innerHTML=`<p class="hint">Operatorul gestionează comenzile; colegul de la colete pregătește și expediază; vizualizarea nu permite modificări. Aceste roluri sunt pentru Live. Emiterea bonurilor păstrează separat drepturile de casă.</p>${me().primary_admin?btn('Adaugă cont de coleg','user-new','','primary'):''}<div class="order-grid">${rows.map(u=>`<article class="order-card"><h2>${h(u.name)}</h2><p class="break">${h(u.email||'Cont magazin')}</p><p>${h(roles[u.role])}${!u.active?' · cont inactiv':''}</p>${!u.primary&&u.active?btn('Schimbă rolul','role',u.id):'<small>Administrator principal</small>'}</article>`).join('')}</div>`;
+}
+async function showLegacy(){const e=epoch;try{const data=await window.amsBackend.load();if(e!==epoch||page()!=='arhiva')return;const old=data.state?.orders||[];$('content').innerHTML=old.length?`<p class="hint">Aceste comenzi nu rezervă stocul magazinului. Sunt păstrate pentru consultare.</p><div class="order-grid">${old.map(o=>`<article class="order-card"><h2>${h(o.customer)}</h2><p>${h(o.phone)} · ${h(o.city)}</p><p>${h(o.status)} · ${h(money(o.amount))}</p><p>${h(o.notes)}</p></article>`).join('')}</div>`:'<p class="empty">Nu există comenzi manuale anterioare.</p>';}catch(error){if(e===epoch&&page()==='arhiva')$('content').textContent='Arhiva necesită dreptul de vânzare din magazin.';}}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,id=b.dataset.id;run(async()=>{
+ if(action==='refresh'){await refresh();notice('Date actualizate.');}if(action==='new')editOrder();
+ if(action==='add'){const p=products.find(x=>x.id===id);if(cart.some(x=>x.id===id))cart=cart.filter(x=>x.id!==id);else cart.push({...p});renderCatalog();}
+ if(action==='scan')window.amsScan(code=>{query=code;renderCatalog();});if(action==='products-more'){limit+=40;renderCatalog();}
+ if(action==='more'){const rows=await api('list',{offset});const seen=new Set(orders.map(o=>o.id));orders.push(...rows.filter(o=>!seen.has(o.id)));offset+=rows.length;more=rows.length===100;render();}
+ if(action==='order')await openOrder(id);if(action==='edit')editOrder(await api('get',{id}));if(action==='product')await productDetails(id);if(action==='packing')await packing(id);if(action==='contact')await contact(id);if(action==='print')window.print();
+ if(action==='address'){const o=await api('get',{id});await navigator.clipboard.writeText([o.customer.name,o.customer.phone,o.customer.address,o.customer.city,o.customer.county,o.customer.postal].filter(Boolean).join('\n'));notice('Adresa a fost copiată.');}
+ if(action==='cancel-order'){const o=await api('get',{id});form('Anulează comanda #'+o.number,`<p>Eliberezi cele ${o.items.length} bucăți rezervate pentru ${h(o.customer.name)}.</p>`,async()=>{await api('cancel',{id,revision:o.revision});await refresh();notice('Comandă anulată. Bucățile sunt disponibile.');},'Confirmă anularea');}
+ if(action==='audit'){const rows=await api('audit',{id});const labels={save:'Comandă salvată',contact:'Date client actualizate',reserve:'Produse rezervate',cancel:'Comandă anulată',fulfill:'Stare colet modificată',checkout_prepare:'Preluare fiscală',checkout_release:'Revenire la rezervarea Live',checkout_commit:'Vânzare fiscală confirmată'};form('Jurnalul comenzii',rows.map(a=>`<article class="audit-row"><b>${h(labels[a.action]||a.action)}</b><p>${h(a.actor_name)} · ${h(new Date(a.created_at).toLocaleString('ro-RO'))}</p><small>${h(a.detail.to?stages[a.detail.to]||a.detail.to:a.detail.receipt_code||'')}</small></article>`).join(''));}
+ if(action==='role'){const rows=await api('team'),u=rows.find(x=>x.id===id);form('Acces · '+u.name,select('role','Rol Live',roles,u.role),async fd=>{await api('member',{user_id:id,role:fd.get('role')});await showTeam();});}
+ if(action==='session-new')form('Sesiune Live nouă',field('name','Denumire live','','text','required maxlength="160"'),async fd=>{await api('session_create',{name:fd.get('name')});await refresh();});
+ if(action==='user-new')form('Cont separat pentru coleg',`${field('username','Nume de utilizator','','text','required pattern="[a-z0-9._-]{3,40}" autocomplete="off"')}${field('display_name','Nume afișat','','text','required maxlength="160"')}${field('password','Parolă inițială','','password','required minlength="8" autocomplete="new-password"')}${select('role','Rol Live',roles,'operator')}<p class="hint">Contul primește o adresă de conectare internă, afișată în lista echipei. Comunică-i colegului datele separat.</p>`,async fd=>{const r=await window.amsBackend.createUser({username:fd.get('username'),display_name:fd.get('display_name'),password:fd.get('password')});$('fields').querySelector('[name=password]').value='';try{await api('member',{user_id:r.user_id,role:fd.get('role')});}catch(error){notice('Cont creat, dar rolul trebuie setat din lista echipei: '+error.message,true);}await showTeam();});
+ });});
+window.addEventListener('hashchange',()=>{query='';limit=40;render();});
+window.addEventListener('ams:signed-in',()=>{epoch++;loading=false;refresh();});
+window.addEventListener('ams:signed-out',()=>{epoch++;loading=false;orders=[];products=[];sessions=[];cart=[];close();$('content').replaceChildren();$('metrics').replaceChildren();$('actions').replaceChildren();notice('');});
+function connection(){$('offline-notice').hidden=navigator.onLine;}window.addEventListener('offline',connection);window.addEventListener('online',()=>{connection();refresh();});connection();
+setInterval(()=>{if(document.visibilityState==='visible'&&!$('modal').open&&window.amsBackend?.ready)refresh();},60000);
 })();

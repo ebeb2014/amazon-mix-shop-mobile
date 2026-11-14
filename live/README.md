@@ -1,26 +1,33 @@
-# Amazon Mix Shop Live — independent phone app
+# Amazon Mix Shop Live 4.0
 
-Install URL: https://ebeb2014.github.io/amazon-mix-shop-mobile/live/
+Aplicație mobilă separată: https://ebeb2014.github.io/amazon-mix-shop-mobile/live/
+Autentificare prin contul magazinului, fără cont ChatGPT. Instalare PWA din Chrome Android / Safari iPhone.
 
-This PWA is hosted on the existing GitHub Pages site, with its own app identity, icons, session storage key and service-worker scope. The original mobile dashboard files remain unchanged. It does not require ChatGPT authentication.
+- Stoc real pe bucată, căutare EAN/cod/număr Live și scanare cameră (ZXing inclus local).
+- Comandă cu mai multe produse, preț final pe bucată, transport, avans și rest.
+- Rezervare atomică în `ams_products.reservation_code`; anularea eliberează numai rezervarea proprie.
+- Adresa se poate completa ulterior; coletul nu se împachetează fără datele de livrare și nu se expediază înainte de fiscalizare.
+- Fotografii private și stare pe fiecare unitate, număr Live unic, editări cu verificarea reviziei.
+- Roluri manager/operator/packer/viewer/disabled, conturi separate prin funcția existentă de administrare, jurnal cu autor și oră.
+- AWB introdus manual; integrarea API cu un curier necesită configurarea contractului. Comentariile TikTok nu sunt importate automat.
+- Arhiva manuală anterioară este păstrată în `ams_live_state`, fără rezervări retroactive.
 
-Sign in using the existing store account's email and password. The account must be active in `ams_app_users` and have `pos.sell=allow`; the primary administrator already qualifies through the existing permission system. No new users, passwords or broader grants are created. Sessions refresh through the pinned Supabase SDK. The password is cleared after submission and is never stored by the app.
+## Desktop
 
-Orders and manual inventory are shared by store owner in `ams_live_state`, protected by RLS. Save RPCs validate the complete state and reject stale revisions so simultaneous phones cannot silently overwrite one another. Unknown users and anonymous requests cannot read or write the data. The stock catalog uses an authenticated, read-only RPC and the existing product RLS. No service key is shipped to the client.
+Modulul și pachetul Windows sunt dezvoltate în repository-ul privat `ebeb2014/amazon-mix-shop-desktop`, folder `desktop-live`, workflow `build-live-desktop.yml`. Se pornește de la arhiva V24.20 verificată SHA256, nu de la configurații sau date ale magazinului.
 
-The old Site database was checked before this migration and contained zero rows. No user order data was copied into this public repository. The old private Site remains available independently.
+Preluare din Vânzări → Comenzi online, numai în bon gol. Snapshotul păstrează `live_order_id` pe fiecare unitate, inclusiv după restaurarea coșurilor. `checkout_prepare` transferă rezervarea către bon în aceeași tranzacție. `checkout_commit` folosește funcția fiscală atomică existentă și marchează comanda fiscalizată numai la BONOK=1. Răspunsurile necunoscute păstrează tentativa pentru reconciliere; nu se reemite bonul. Eșecul fiscal confirmat restabilește rezervarea Live.
 
-## Installation
+Noua versiune PC cere conexiune înainte de emiterea bonurilor, pentru a respecta rezervările concurente de pe telefoane. Recuperarea vechilor bonuri offline este păstrată. Versiunile vechi instalate pe PC nu pot primi această protecție până la actualizare.
 
-- Android Chrome: menu → Add to Home screen / Install app.
-- iPhone Safari: Share → Add to Home Screen; enable Open as Web App if offered.
+Transportul și avansul sunt afișate în comandă și notele preluării. Operatorul verifică documentele și încasările; nu sunt inventate linii fiscale sau deduceri automate.
 
-The app requires internet for stock and saves. Only a generic offline page is cached. No native store listing or APK is required for the existing PWA installation method.
+## Validare
 
-## Development and validation
+`npm ci && npm run build && npm test`
 
-`npm ci`, `npm run build`, `npm test` from this directory. The compiled `auth.js` is committed because GitHub Pages serves static files directly. Dependencies are pinned in `package.json` and `package-lock.json`.
+SQL: `tests/workflow.sql` și `tests/workflow-extra.sql` se execută tranzacțional, cu identitatea unui administrator existent și `SET LOCAL ROLE authenticated`; toate scrierile se anulează cu ROLLBACK. Acoperă rezervare, conflicte, anulare, transfer la POS, eșec fiscal, confirmare atomică, idempotentă, roluri, RLS, fotografii și date client.
 
-The additive database migration is in `supabase/migrations/`. Apply it through the authenticated database management workflow. `tests/database.sql` verifies authorization, validation, optimistic concurrency and catalog mapping inside a transaction which rolls back all test writes. Existing stock quantities, receipts and fiscal procedures are not modified.
+`tests/qa-fixture.js` conține exclusiv date fictive. Este injectat numai de serverul local la `?qa=1`, niciodată de aplicația publicată. Ecranul la 390px a fost verificat, inclusiv salvarea unei comenzi cu 2 produse și total transport/avans. Testul cu aparatul fiscal fizic și camerele telefoanelor se face la magazin.
 
-Online reservations and transfer of orders to the store PC's fiscal flow remain pending confirmation of the exact desktop version installed in the store. Confirming a manual order currently changes only manual inventory; the UI explains this limitation.
+Serverul interzice scrierea directă în tabelele Live. RPC-ul public este SECURITY INVOKER; funcția privată verifică identitatea, magazinul, rolul și revizia înainte de orice modificare. Nicio cheie secretă nu este inclusă în client. Service worker-ul păstrează numai pagina generică de lipsă conexiune, fără date private.

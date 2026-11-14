@@ -1,3 +1,4 @@
+import './scanner.js';
 import {createClient} from '@supabase/supabase-js';
 const $=id=>document.getElementById(id);
 const cfg=window.AMS_CONFIG;
@@ -25,11 +26,10 @@ async function verifyIdentity(){
     const result=await client.from('ams_app_users').select('user_id,owner_id,display_name,username,active').eq('user_id',user.id).maybeSingle();
     if(result.error)throw problem(result.error);
     if(!result.data?.active)throw new Error('Contul nu este activ în Amazon Mix Shop.');
-    const permission=await client.rpc('ams_permission_mode',{p_permission_code:'pos.sell'});
+    const permission=await client.rpc('ams_live_api',{p_action:'identity',p_data:{}});
     if(permission.error)throw problem(permission.error);
-    if(permission.data!=='allow')throw new Error('Pentru comenzi Live, contul are nevoie de permisiunea de vânzare „Permis”.');
     if(epoch!==generation)return;
-    identity=result.data;
+    identity={...result.data,...permission.data};
     $('account-label').textContent=identity.display_name||identity.username||'Cont magazin';
     $('login-progress').textContent='';$('login-error').hidden=true;
     document.body.classList.remove('signed-out');
@@ -45,6 +45,26 @@ async function rpc(name,params={}){
 }
 window.amsBackend={
   get ready(){return !!identity;},
+  get identity(){return identity;},
+  call:(action,data={})=>rpc('ams_live_api',{p_action:action,p_data:data}),
+  async photos(paths){
+    if(!paths?.length)return [];
+    const {data,error}=await client.storage.from('ams-live-products').createSignedUrls(paths,300);
+    if(error)throw problem(error);return data.map(x=>x.signedUrl).filter(Boolean);
+  },
+  async upload(productId,file){
+    if(!identity)throw new Error('Conectează-te din nou.');
+    if(file.size>8388608)throw new Error('Fotografia trebuie să aibă cel mult 8 MB.');
+    const ext={'image/jpeg':'jpg','image/png':'png','image/webp':'webp'}[file.type];
+    if(!ext)throw new Error('Alege o fotografie JPG, PNG sau WebP.');
+    const path=identity.owner_id+'/'+productId+'/'+crypto.randomUUID()+'.'+ext;
+    const {error}=await client.storage.from('ams-live-products').upload(path,file,{upsert:false,contentType:file.type});
+    if(error)throw problem(error);return path;
+  },
+  async createUser(body){
+    const {data,error}=await client.functions.invoke('ams-admin-users',{body:{action:'create',...body}});
+    if(error||data?.error)throw problem(error||data);return data;
+  },
   load:()=>rpc('ams_live_get_state'),
   save:({revision,state})=>rpc('ams_live_save_state',{p_revision:revision,p_state:state}),
   async catalog(){
