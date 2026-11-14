@@ -1,0 +1,9 @@
+{
+  "name":"amazon-mix-shop-live",
+  "private":true,
+  "version":"3.0.0",
+  "type":"module",
+  "scripts":{"build":"node build.mjs","test":"node --test tests/*.test.mjs","dev":"node tests/dev-server.mjs"},
+  "dependencies":{"@supabase/supabase-js":"2.119.0"},
+  "devDependencies":{"esbuild":"0.28.2","supabase":"3.1.0"}
+}

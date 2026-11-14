@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Amazon Mix Shop · Panou TikTok Live</title>
+<meta name="description" content="Panou privat pentru comenzile, stocul și sesiunile TikTok Live ale Amazon Mix Shop.">
+<meta name="theme-color" content="#211a32">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="AMS Live">
+<link rel="manifest" href="./manifest.webmanifest" crossorigin="use-credentials">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" href="./icons/icon-192.png" type="image/png">
+<link rel="stylesheet" href="./style.css"><script src="../config.js"></script><script src="./catalog.js" defer></script><script src="./app.js" defer></script><script src="./pwa.js" defer></script><script src="./auth.js" type="module"></script>
+</head>
+<body class="signed-out">
+<section id="login-screen" aria-labelledby="login-title"><div class="login-card"><span class="logo" aria-hidden="true">▦</span><p class="eyebrow">AMAZON MIX SHOP · LIVE</p><h1 id="login-title">Comenzile tale,<br>direct pe telefon.</h1><p class="muted">Conectează-te cu emailul și parola contului din magazin.</p><form id="login-form"><label>Email<input id="login-email" name="email" type="email" autocomplete="username" required></label><label>Parolă<input id="login-password" name="password" type="password" autocomplete="current-password" required></label><p id="login-error" role="alert" hidden></p><button class="primary" id="login-submit" type="submit">Conectează-te</button></form><button type="button" id="install-login">Instalează pe telefon</button><p id="login-progress" role="status">Se verifică sesiunea…</p></div></section>
+<aside class="sidebar">
+  <a class="brand" href="#comenzi"><span class="logo" aria-hidden="true">▦</span><span>Amazon Mix Shop<small>GESTIUNE MAGAZIN</small></span></a>
+  <nav aria-label="Secțiuni"><a href="#comenzi"><span>▤</span> Comenzi</a><a href="#magazin"><span>▦</span> Stoc magazin</a><a href="#stoc"><span>◇</span> Stoc manual</a><a href="#live"><span>◉</span> Sesiuni Live</a></nav>
+  <div class="hours"><strong>Program magazin</strong><p>Luni–vineri <b>09:00–18:00</b></p><p>Sâmbătă–duminică <b>08:00–16:00</b></p></div>
+</aside>
+<main>
+  <div class="top"><span><i></i> TikTok Live</span><div class="account-actions"><span id="account-label"></span><button id="logout" type="button">Ieșire</button><button type="button" id="install-app">Instalează pe telefon</button></div></div>
+  <p id="offline-notice" role="status" hidden>Nu ai conexiune la internet. Stocul nu poate fi verificat și modificările nu se salvează.</p>
+  <header class="heading"><div><h1 id="title">Comenzi</h1><p id="subtitle">Urmărește comenzile primite în timpul live-urilor.</p></div><div id="actions"></div></header>
+  <p id="notice" role="status" hidden></p>
+  <section id="metrics" class="metrics" aria-label="Rezumat"></section>
+  <section id="content" aria-label="Înregistrări"><p>Se încarcă datele…</p></section>
+</main>
+<dialog id="install-dialog"><div class="install-content"><div class="dialog-head"><h2>Amazon Mix Shop pe telefon</h2><button type="button" class="icon" id="close-install" aria-label="Închide instrucțiunile">×</button></div><p>Deschide această adresă pe telefon. Folosește emailul și parola contului Amazon Mix Shop din magazin.</p><p class="install-address">ebeb2014.github.io/amazon-mix-shop-mobile/live/</p><h3>Android · Chrome</h3><p>Apasă meniul <b>⋮</b>, apoi <b>Adaugă pe ecranul de pornire</b> → <b>Instalează</b>. Dacă apare doar opțiunea de scurtătură, aceasta deschide aceeași aplicație.</p><h3>iPhone · Safari</h3><p>Apasă <b>Partajează</b> → <b>Adăugați la ecranul principal</b>. Activează <b>Deschideți ca aplicație web</b>, dacă apare, apoi <b>Adăugați</b>.</p><p class="hint">Este necesar internet pentru comenzi și stoc. Accesul urmează permisiunile contului din magazin.</p><footer><button type="button" class="primary" id="native-install" hidden>Instalează aplicația</button><button type="button" id="done-install">Am înțeles</button></footer></div></dialog>
+<dialog id="modal"><form id="editor"><div class="dialog-head"><h2 id="dialog-title"></h2><button class="icon" type="button" id="close" aria-label="Închide">×</button></div><div id="fields"></div><p id="form-error" role="alert" hidden></p><footer><button type="button" id="cancel">Renunță</button><button class="primary" type="submit">Salvează</button></footer></form></dialog>
+</body></html>

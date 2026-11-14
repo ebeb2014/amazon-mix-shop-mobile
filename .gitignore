@@ -1,0 +1,4 @@
+live/node_modules/
+live/.preview/
+live/.env*
+live/supabase/.temp/
