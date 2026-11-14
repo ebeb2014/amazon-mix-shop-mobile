@@ -1,0 +1,15 @@
+AMAZON MIX SHOP LIVE — ACTUALIZARE PC 1.6.21
+
+1. Copiază și dezarhivează întregul pachet pe stick / calculator.
+2. Închide aplicația magazinului după finalizarea bonurilor în curs.
+3. Rulează Actualizeaza.cmd. Alege executabilul folosit efectiv la magazin (poți afla calea din Proprietăți la scurtătura obișnuită).
+4. Se creează automat o copie .bak a executabilului vechi. Configurările și datele nu se șterg.
+5. Pornește aplicația din aceeași scurtătură. Vânzări → Comenzi online → Preia în bon.
+
+Internetul este necesar înainte de emiterea unui bon: stocul poate fi rezervat de pe telefon. Coada bonurilor emise anterior rămâne disponibilă pentru recuperare.
+
+Produsele devin vândute numai după confirmarea FiscalNet. La eroare fiscală confirmată, rezervarea revine în Live. La răspuns necunoscut, bonul trebuie reconciliat; nu se emite a doua oară.
+
+Transportul și avansul sunt afișate separat. Nu sunt transformate automat în încasări sau linii fiscale. Operatorul verifică documentele aferente.
+
+Pachet construit din sursa verificată V24.20 / release 1.6.15, plus modulul Live. Testele automate nu înlocuiesc proba pe calculatorul magazinului și casa Datecs. Pentru revenire: închide aplicația, păstrează noul exe separat și copiază backupul peste executabilul actual. Nu reveni la o versiune veche în timp ce există comenzi online la casă.
