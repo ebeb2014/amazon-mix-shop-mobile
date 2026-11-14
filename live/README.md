@@ -31,3 +31,34 @@ SQL: `tests/workflow.sql` și `tests/workflow-extra.sql` se execută tranzacțio
 `tests/qa-fixture.js` conține exclusiv date fictive. Este injectat numai de serverul local la `?qa=1`, niciodată de aplicația publicată. Ecranul la 390px a fost verificat, inclusiv salvarea unei comenzi cu 2 produse și total transport/avans. Testul cu aparatul fiscal fizic și camerele telefoanelor se face la magazin.
 
 Serverul interzice scrierea directă în tabelele Live. RPC-ul public este SECURITY INVOKER; funcția privată verifică identitatea, magazinul, rolul și revizia înainte de orice modificare. Nicio cheie secretă nu este inclusă în client. Service worker-ul păstrează numai pagina generică de lipsă conexiune, fără date private.
+
+
+## Live 5.0: team and delivery
+
+New sections: Notifications, Live reports, reservations older than 24 hours, GLS.
+Orders have exclusive self-assignment, per-unit internal-code packing verification,
+and a revocable 7-day customer link. Customer links contain a random 256-bit token
+in the URL fragment; only the SHA-256 digest is stored. Access closes at packing
+or fiscal checkout. Full session reports aggregate server-side.
+
+Push is opt-in per device and uses a separate VAPID identity stored in Vault.
+A minute cron dispatches event deliveries with leases, retries and deduplication.
+Stale reservations generate at most one event per order/day, never auto-cancel.
+No real notification or shipment was sent during automated tests.
+
+GLS requires the primary administrator to enter MyGLS email/password, contractual
+client number and pickup address in Courier. Credentials are verified with
+GetParcelList, then the SHA-512 password representation is encrypted in Vault.
+Production labels require a fiscalized, scanned, packed order and an explicit
+COD amount. One parcel per order. The order is never marked shipped automatically.
+The PDF is in a private bucket, with download links valid for 120 seconds.
+Unknown carrier results block another PrintLabels call; recovery searches the
+exact ClientReference then reprints the same ParcelId. Rejected requests can be
+corrected and restarted. Test labels never write a production AWB.
+
+GLS live-account verification and a real label test remain pending until the
+owner enters their credentials. Native iPhone push/camera/printing must be
+checked on the actual devices.
+
+Validation: npm test; rollback SQL workflow.sql, workflow-extra.sql,
+team-workflow.sql, push-workflow.sql, gls-workflow.sql.

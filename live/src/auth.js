@@ -46,7 +46,26 @@ async function rpc(name,params={}){
 window.amsBackend={
   get ready(){return !!identity;},
   get identity(){return identity;},
+  team:(action,data={})=>rpc('ams_live_team_api',{p_action:action,p_data:data}),
   call:(action,data={})=>rpc('ams_live_api',{p_action:action,p_data:data}),
+  gls:(action,data={})=>rpc('ams_live_gls',{p_action:action,p_data:data}),
+  async glsRequest(body){
+    if(!identity)throw new Error('Conectează-te din nou.');
+    const {data,error}=await client.functions.invoke('ams-live-gls',{body});
+    if(error){let detail;try{detail=await error.context?.json();}catch{}throw new Error(detail?.error||error.message);}
+    if(data?.error)throw new Error(data.error);return data;
+  },
+  async enablePush(){
+    if(!('Notification' in window)||!('PushManager' in window)||!('serviceWorker' in navigator))throw new Error('Notificările nu sunt disponibile aici. Pe iPhone deschide aplicația instalată.');
+    const permission=await Notification.requestPermission();
+    if(permission!=='granted')throw new Error('Permite notificările din setările telefonului pentru această aplicație.');
+    const config=await rpc('ams_live_push',{p_action:'config',p_data:{}});
+    if(!config?.publicKey)throw new Error('Notificările nu sunt configurate încă.');
+    const registration=await navigator.serviceWorker.ready;
+    const key=Uint8Array.from(atob(config.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+    const subscription=await registration.pushManager.getSubscription()||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+    await rpc('ams_live_push',{p_action:'subscribe',p_data:subscription.toJSON()});
+  },
   async photos(paths){
     if(!paths?.length)return [];
     const {data,error}=await client.storage.from('ams-live-products').createSignedUrls(paths,300);
@@ -93,6 +112,12 @@ $('login-form').addEventListener('submit',async event=>{
 });
 $('logout').addEventListener('click',async()=>{
   signedOut();
+  // Remove this device's subscription while its session is still authenticated.
+  try {
+    const registration=await navigator.serviceWorker?.getRegistration('./');
+    const subscription=await registration?.pushManager.getSubscription();
+    if(subscription){await client.rpc('ams_live_push',{p_action:'disable',p_data:{endpoint:subscription.endpoint}});await subscription.unsubscribe();}
+  } catch { /* Sign-out remains available if the network is down. */ }
   await client.auth.signOut({scope:'local'});
 });
 client.auth.onAuthStateChange((event,session)=>{

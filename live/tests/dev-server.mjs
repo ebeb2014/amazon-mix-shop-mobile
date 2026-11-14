@@ -2,7 +2,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 const prefix='/amazon-mix-shop-mobile/live/';
 const root=new URL('../',import.meta.url);
-const files=new Set(['tests/qa-fixture.js','index.html','app.js','auth.js','catalog.js','pwa.js','style.css','manifest.webmanifest','sw.js','offline.html','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png']);
+const files=new Set(['gls.js','team.js','client.js','client.html','tests/qa-fixture.js','index.html','app.js','auth.js','catalog.js','pwa.js','style.css','manifest.webmanifest','sw.js','offline.html','icons/icon-192.png','icons/icon-512.png','icons/apple-touch-icon.png']);
 const types={html:'text/html',js:'text/javascript',css:'text/css',png:'image/png',webmanifest:'application/manifest+json'};
 const arg=name=>{const i=process.argv.indexOf(name);return i<0?null:process.argv[i+1];};
 const port=Number(arg('--port')||process.env.PORT||4173),host=arg('--host')||'127.0.0.1';

@@ -7,3 +7,16 @@ self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET'||event.request.mode!=='navigate'||!url.href.startsWith(self.registration.scope))return;
   event.respondWith(fetch(event.request).catch(async()=>await caches.match(offlineUrl)||new Response('Conectează-te la internet pentru a deschide Amazon Mix Shop.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}})));
 });
+
+self.addEventListener('push',event=>{
+ let data={};try{data=event.data?.json()||{};}catch{}
+ event.waitUntil(self.registration.showNotification('Amazon Mix Shop',{body:data.body||'Actualizare în aplicația Live',tag:data.tag||'ams-live',icon:new URL('icons/icon-192.png',self.registration.scope).href,data:{url:new URL('#notificari',self.registration.scope).href}}));
+});
+self.addEventListener('notificationclick',event=>{
+ event.notification.close();
+ const url=new URL('#notificari',self.registration.scope).href;
+ event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async clients=>{
+  const client=clients.find(c=>c.url.startsWith(self.registration.scope));
+  if(client){await client.navigate(url);return client.focus();}return self.clients.openWindow(url);
+ }));
+});

@@ -2,7 +2,7 @@ begin;
 select set_config('request.jwt.claim.sub',(select user_id::text from public.ams_app_users where active and is_primary_admin order by created_at limit 1),true);
 set local role authenticated;
 do $$
-declare a jsonb;b jsonb;c jsonb;ids jsonb;sid uuid:=gen_random_uuid(); oid uuid:=gen_random_uuid(); other uuid:=gen_random_uuid(); snap jsonb; saved jsonb; staff uuid; uid uuid:=auth.uid(); denied boolean;
+declare a jsonb;b jsonb;c jsonb;ids jsonb;sid uuid:=gen_random_uuid(); oid uuid:=gen_random_uuid(); other uuid:=gen_random_uuid(); snap jsonb; saved jsonb; staff uuid; uid uuid:=auth.uid(); denied boolean; line jsonb;
 begin
  select jsonb_agg(jsonb_build_object('id',id::text,'price',100)) into ids from(select id from public.ams_products where owner_id=public.ams_current_owner_id() and status='In stoc' and coalesce(reservation_code,'')='' order by id limit 2) x;
  if jsonb_array_length(ids)<>2 then raise exception 'Need two available units';end if;
@@ -31,6 +31,8 @@ begin
  if saved->>'status'<>'already_saved' then raise exception 'Duplicate sale not idempotent';end if;
  if (select count(*) from public.ams_products where id in (select (x->>'id')::bigint from jsonb_array_elements(ids) x) and status='Vândut')<>2 then raise exception 'Stock not sold';end if;
  b:=public.ams_live_api('get',jsonb_build_object('id',oid));
+ b:=public.ams_live_team_api('claim',jsonb_build_object('id',oid,'revision',b->'revision'));
+ for line in select value from jsonb_array_elements(b->'items') loop b:=public.ams_live_team_api('scan',jsonb_build_object('id',oid,'revision',b->'revision','code',line->>'code'));end loop;
  c:=public.ams_live_api('fulfill',jsonb_build_object('id',oid,'revision',b->'revision','fulfillment','shipped','courier','TEST','awb','TEST'));
  if c->>'fulfillment'<>'shipped' then raise exception 'Shipping not saved';end if;
  select user_id into staff from public.ams_app_users where owner_id=public.ams_current_owner_id() and active and not is_primary_admin limit 1;
