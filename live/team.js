@@ -27,7 +27,7 @@
       <div class="order-lines">${o.items.map(i => `<p>${checked.has(String(i.id)) ? '✓' : '○'} ${h(i.code)} · ${h(i.name)}</p>`).join('')}</div>
       ${mine && ['new','packing'].includes(o.fulfillment) ? `<label>Cod intern al bucății<input id="packing-code" autocomplete="off"></label><div class="detail-actions">${btn('Verifică acest cod','team-check',id)}${btn('Scanează cu camera','team-camera',id)}</div>` : ''}
       <p class="hint">Fiecare bucată se verifică prin codul intern de pe eticheta magazinului. EAN-ul poate fi comun mai multor bucăți.</p>
-      ${canLink && ['draft','reserved'].includes(o.status) ? `<h3>Link pentru client</h3><p>Clientul vede produsele și completează adresa fără cont. Linkul expiră în 7 zile. Un link nou îl înlocuiește pe cel anterior.</p>${btn('Creează link client','team-link',id)}${detail.link_active ? btn('Revocă linkul','team-revoke',id) : ''}<div id="customer-link"></div>` : ''}
+      ${canLink && ['draft','reserved'].includes(o.status) && ['new','packing'].includes(o.fulfillment) ? `<h3>Link pentru client</h3><p>Clientul vede produsele și completează adresa fără cont. Linkul expiră în 7 zile. Un link nou îl înlocuiește pe cel anterior.</p>${btn('Creează link client','team-link',id)}${detail.link_active ? btn('Revocă linkul','team-revoke',id) : ''}<div id="customer-link"></div>` : ''}
       <div class="detail-actions">${canWork?btn('AWB automat GLS','gls-order',id):''}${btn('Înapoi la comandă','order',id)}</div>`);
   }
   async function mutation(action, id, extra = {}) {

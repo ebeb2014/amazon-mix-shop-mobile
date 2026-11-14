@@ -35,6 +35,8 @@ begin
  denied:=false;begin perform public.ams_live_customer(token);exception when raise_exception then denied:=true;end;
  if not denied then raise exception 'Revoked link accepted';end if;
  o:=public.ams_live_api('fulfill',jsonb_build_object('id',oid,'revision',o->'revision','fulfillment','packed'));
+ denied:=false;begin perform public.ams_live_team_api('link_create',jsonb_build_object('id',oid,'revision',o->'revision'));exception when raise_exception then denied:=true;end;
+ if not denied then raise exception 'Packed order customer link created';end if;
  details:=public.ams_live_team_api('events');if not exists(select 1 from jsonb_array_elements(details->'events') e where e->>'order_id'=oid::text and e->>'title' like 'Colet pregătit%') then raise exception 'Packing event missing';end if;
  perform public.ams_live_team_api('reports');
  begin perform public.ams_live_push_worker('config');raise exception 'Worker secrets exposed';exception when insufficient_privilege then null;end;
