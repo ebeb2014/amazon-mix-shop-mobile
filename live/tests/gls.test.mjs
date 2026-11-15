@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {glsDate,labelBytes,matchingParcel,validateSettings} from '../supabase/functions/ams-live-gls/protocol.mjs';
+import {glsDate,labelBytes,matchingParcel,validateSettings,validateAccountProbe} from '../supabase/functions/ams-live-gls/protocol.mjs';
 test('GLS labels reject non-PDF payloads and recover only one exact client reference',()=>{
  assert.throws(()=>labelBytes([1,2,3]));
  assert.equal(new TextDecoder().decode(labelBytes([37,80,68,70,45,49])), '%PDF-1');
@@ -16,4 +16,13 @@ test('GLS setup requires actual account and complete Romanian pickup address',()
  assert.throws(()=>validateSettings({...c,ClientNumber:0}));
  assert.throws(()=>validateSettings({...c,PickupAddress:{...c.PickupAddress,ZipCode:''}}));
  assert.throws(()=>validateSettings({...c,mode:'https://attacker.test'}));
+});
+
+test('account probe accepts empty history but rejects authentication and mixed errors',()=>{
+ for(const code of [26,'26'])assert.doesNotThrow(()=>validateAccountProbe({GetParcelListErrors:[{ErrorCode:code,ErrorDescription:'Parcel not found with current settings'}],PrintDataInfoList:null}));
+ assert.doesNotThrow(()=>validateAccountProbe({GetParcelListErrors:[],PrintDataInfoList:[]}));
+ assert.doesNotThrow(()=>validateAccountProbe({GetParcelListErrors:[],PrintDataInfoList:[{ParcelId:1}]}));
+ assert.throws(()=>validateAccountProbe({GetParcelListErrors:[{ErrorCode:-1,ErrorDescription:'Unauthorized.'}],PrintDataInfoList:null}),/Unauthorized/);
+ assert.throws(()=>validateAccountProbe({GetParcelListErrors:[{ErrorCode:26},{ErrorCode:-1}],PrintDataInfoList:[]}),/GLS -1/);
+ for(const value of [null,{}, {GetParcelListErrors:{}}, {GetParcelListErrors:[null]}, {GetParcelListErrors:[{ErrorCode:26}],PrintDataInfoList:'bad'}])assert.throws(()=>validateAccountProbe(value));
 });

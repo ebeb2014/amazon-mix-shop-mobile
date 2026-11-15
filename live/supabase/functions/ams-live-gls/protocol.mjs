@@ -21,3 +21,13 @@ export function validateSettings(c) {
  if(!['A4_2x2','Thermo'].includes(c.TypeOfPrinter))throw new Error('Format de etichetă invalid.');
  return {...c,ClientNumber:Number(c.ClientNumber),PickupAddress:{...a,CountryIsoCode:'RO'}};
 }
+
+// Code 26 is an empty search result, acceptable only for the read-only account probe.
+export function validateAccountProbe(result) {
+ const errors=result?.GetParcelListErrors;
+ if(errors!=null&&!Array.isArray(errors))throw new Error('Răspuns MyGLS neașteptat. Configurarea nu a fost salvată.');
+ const failures=(errors||[]).filter(e=>e?.ErrorCode!==26&&e?.ErrorCode!=='26');
+ if(failures.length)throw new Error(failures.map(e=>`GLS ${e?.ErrorCode}: ${e?.ErrorDescription||'Cerere respinsă'}`).join('; ').slice(0,500));
+ if(errors?.length && (result.PrintDataInfoList==null||Array.isArray(result.PrintDataInfoList)))return;
+ if(!Array.isArray(result?.PrintDataInfoList))throw new Error('Răspuns MyGLS neașteptat. Configurarea nu a fost salvată.');
+}

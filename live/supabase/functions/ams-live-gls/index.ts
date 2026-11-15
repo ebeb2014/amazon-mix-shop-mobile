@@ -1,5 +1,5 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.119.0';
-import {glsDate,labelBytes,matchingParcel,validateSettings} from './protocol.mjs';
+import {glsDate,labelBytes,matchingParcel,validateSettings,validateAccountProbe} from './protocol.mjs';
 const url=Deno.env.get('SUPABASE_URL')!;
 const service=createClient(url,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const cors={'Access-Control-Allow-Origin':'https://ebeb2014.github.io','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Vary':'Origin'};
@@ -33,8 +33,7 @@ Deno.serve(async req=>{
    config.Password=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-512',new TextEncoder().encode(body.password))));
    const now=Date.now();
    const check=await carrier(config,'GetParcelList',{PrintDateFrom:glsDate(now-3600000),PrintDateTo:glsDate(now)});
-   const problem=errors(check,'GetParcelListErrors');if(problem)throw new Error(problem);
-   if(!Array.isArray(check.PrintDataInfoList))throw new Error('Răspuns MyGLS neașteptat. Configurarea nu a fost salvată.');
+   validateAccountProbe(check);
    await rpc('save_config',{config});return reply({connected:true,mode:config.mode});
   }
   const id=body.id;
