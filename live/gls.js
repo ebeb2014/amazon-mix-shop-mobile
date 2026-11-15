@@ -49,7 +49,7 @@
    form('GLS · comanda #'+o.number,`<h3>${h(labels[job.state])}</h3>${job.mode==='test'?'<p><b>TEST · Nu folosi eticheta la livrare.</b></p>':''}<p>${h(job.awb||job.message||'Nu genera manual încă un colet înainte de verificare.')}</p><p>Referință GLS: ${h(job.reference)}</p>${job.state==='ready'?btn('Descarcă eticheta PDF','gls-label',id):job.state==='rejected'?btn('Corectează și reia cererea respinsă','gls-reset',id):btn('Verifică în GLS / recuperează eticheta','gls-resolve',id)}<div id="gls-download"></div>`);return;
   }
   if(o.status!=='paid'||o.fulfillment!=='packed'||o.delivery!=='curier'||o.awb){form('AWB · comanda #'+o.number,'<p>AWB-ul automat este disponibil după verificarea tuturor produselor, împachetare și finalizarea bonului. Comanda trebuie să fie pentru curier și să nu aibă deja AWB.</p>');return;}
-  const remaining=Number(o.goods_total)+Number(o.shipping)-Number(o.advance);
+  const remaining=ui().remaining(o.goods_total,o.advance);
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Bucharest',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
   form('Generează AWB GLS · #'+o.number,`${config.mode==='test'?'<p><b>MEDIU DE TEST</b></p>':'<p>Se va crea o expediere reală în contul GLS, conform contractului tău.</p>'}<h3>${h(o.customer.name)}</h3><p>${h(o.customer.phone)} · ${h(o.customer.address)} · ${h(o.customer.city)} · ${h(o.customer.postal)}</p><p>Verifică separarea străzii și a numărului pentru eticheta GLS.</p>
    ${field('postal','Cod poștal destinatar',o.customer.postal,'text','required pattern="[0-9]{6}" maxlength="6"')}
@@ -58,9 +58,9 @@
    ${field('address_extra','Bloc / scară / etaj / apartament','','text','maxlength="200"')}
    ${field('weight','Greutate colet (kg)','','number','required min="0.01" max="40" step="0.01"')}
    ${field('pickup_date','Data ridicării',today,'date','required')}
-   ${field('cod','Suma de încasat prin ramburs (lei)','','number',`required min="0" max="${remaining}" step="0.01"`)}
-   <p class="hint">Restul înregistrat este ${money(remaining)}. Confirmă suma efectivă de încasat la livrare. Introdu 0 dacă este deja achitată integral. Bonul fiscal nu confirmă automat încasarea.</p>`,async fd=>{
-    const request={action:'create',id,revision:o.revision,...Object.fromEntries(fd),cod:Number(fd.get('cod')),weight:Number(fd.get('weight'))};
+   <p><b>Ramburs GLS: ${money(remaining)}</b></p>
+   <p class="hint">Valoarea produselor minus avansul înregistrat. Cumpărătorul plătește transportul separat.</p>`,async fd=>{
+    const request={action:'create',id,revision:o.revision,...Object.fromEntries(fd),cod:remaining,weight:Number(fd.get('weight'))};
     try{const result=await backend().glsRequest(request);ui().notice('AWB GLS creat: '+result.awb);await order(id);}catch(error){ui().close();await order(id);const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}
    },'Generează AWB GLS');
  }

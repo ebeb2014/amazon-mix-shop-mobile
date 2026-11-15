@@ -12,7 +12,7 @@
   async function load(){
     try{
       const data=await request();revision=data.revision;
-      document.getElementById('summary').innerHTML=`<h2>Comanda #${data.number}</h2>${data.items.map(i=>`<p>${h(i.name)} · ${money(i.price)}</p>`).join('')}<p>Transport: ${money(data.shipping)}</p><p><b>Total: ${money(data.total)}</b></p><p>Avans înregistrat: ${money(data.advance)}</p>`;
+      document.getElementById('summary').innerHTML=`<h2>Comanda #${data.number}</h2>${data.items.map(i=>`<p>${h(i.name)} · ${money(i.price)}</p>`).join('')}<p><b>Produse: ${money(data.items.reduce((sum,item)=>sum+Number(item.price),0))}</b></p><p>Avans înregistrat: ${money(data.advance)}</p>`;
       const fields={name:['Nume complet',160],phone:['Telefon',30],address:['Stradă, număr, bloc, apartament',500],city:['Localitate',100],county:['Județ / sector',100],postal:['Cod poștal',20]};
       form.innerHTML=Object.entries(fields).map(([key,[label,max]])=>`<label>${label}<input name="${key}" maxlength="${max}" ${key==='postal'?'':'required'} value="${h(data.customer[key])}"></label>`).join('')+'<button class="primary" type="submit">Confirmă datele de livrare</button>';
       form.hidden=false;message.textContent='Link personal. Nu îl distribui altor persoane.';
