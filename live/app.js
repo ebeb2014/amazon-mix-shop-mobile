@@ -17,6 +17,7 @@ const select=(name,label,values,value)=>`<label>${h(label)}<select name="${name}
 function form(title,html,save=null,label='Salvează'){
  modalEpoch++;saveHandler=save;$('dialog-title').textContent=title;$('fields').innerHTML=html;$('fields').oninput=null;$('form-error').hidden=true;
  const submit=$('editor').querySelector('[type=submit]');submit.hidden=!save;submit.textContent=label;submit.disabled=false;$('cancel').textContent=save?'Renunță':'Închide';
+ window.amsPostal?.mount($('fields'));
  if(!$('modal').open)$('modal').showModal();
 }
 function close(){modalEpoch++;saveHandler=null;$('modal').close();$('fields').replaceChildren();}

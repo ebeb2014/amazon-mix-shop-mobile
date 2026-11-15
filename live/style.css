@@ -16,3 +16,8 @@ body.signed-out{display:block}body.signed-out>.sidebar,body.signed-out>main{disp
 @media print{body>*:not(#modal){display:none!important}#modal{display:block;position:static;max-height:none;max-width:none;width:100%;border:0;overflow:visible}#modal::backdrop{background:white}.detail-actions,#modal footer,#close{display:none!important}#editor{padding:0}.line{break-inside:avoid}}
 
 nav a.active{background:#41305d;color:white}.order-card p,.product-card p{margin:8px 0}.order-card>.row:last-child{margin-top:18px}.inline input{margin-top:0}.metrics article>span{color:var(--muted);font-size:13px}
+
+.postal-lookup { grid-column: 1 / -1; }
+.postal-lookup p:empty, .postal-results:empty { display: none; }
+.postal-results { display: grid; gap: .35rem; max-height: 15rem; overflow-y: auto; }
+.postal-results button { text-align: left; min-height: 44px; }
