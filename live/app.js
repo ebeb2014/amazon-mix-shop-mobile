@@ -59,9 +59,27 @@ function render(){
 function orderCard(o){return `<article class="order-card"><div class="row"><span class="badge ${h(o.status)}">${h(states[o.status])}</span><strong>#${h(o.number)}</strong></div><h2>${h(o.customer.name)}</h2><p>${o.items.length} bucăți · ${h(money(o.goods_total))}</p><p class="muted">${h(o.delivery==='ridicare'?'Ridicare magazin':o.customer.city)} · ${h(stages[o.fulfillment])}</p><div class="row">${btn('Deschide comanda','order',o.id)}<small>${h(new Date(o.created_at).toLocaleDateString('ro-RO'))}</small></div></article>`;}
 function renderCatalog(){
  const live=page()==='live';if(live&&canEdit())$('actions').innerHTML=btn('Sesiune nouă','session-new')+btn('Actualizează','refresh');
- $('content').innerHTML=`<div class="tools"><input id="product-search" placeholder="Nume, EAN, cod sau număr Live" aria-label="Caută produse" value="${h(query)}">${btn('Scanează','scan')}<label class="inline"><input id="available-only" type="checkbox" checked> Doar disponibile</label></div>${live?`<div class="live-bar"><div><b>${cart.length} bucăți selectate</b><small>${h(money(cart.reduce((s,p)=>s+Number(p.price),0)))}</small></div>${canEdit()?btn('Date client →','new','','primary'):''}</div>`:''}<div id="product-list" class="product-grid"></div><div id="product-more"></div>`;
+ $('content').innerHTML=`<div class="tools"><input id="product-search" placeholder="Nume, EAN, cod sau număr Live" aria-label="Caută produse" value="${h(query)}">${btn('Scanează cu camera','scan')}${btn('Poză cod de bare','scan-photo')}<input id="barcode-photo" type="file" accept="image/*" capture="environment" hidden><label class="inline"><input id="available-only" type="checkbox" checked> Doar disponibile</label></div>${live?`<div class="live-bar"><div><b>${cart.length} bucăți selectate</b><small>${h(money(cart.reduce((s,p)=>s+Number(p.price),0)))}</small></div>${canEdit()?btn('Date client →','new','','primary'):''}</div>`:''}<div id="product-list" class="product-grid"></div><div id="product-more"></div>`;
  const show=()=>{query=$('product-search').value;const q=query.trim().toLocaleLowerCase('ro');const rows=products.filter(p=>(!$('available-only').checked||p.available)&&[p.name,p.code,p.ean,p.short_code].some(v=>String(v||'').toLocaleLowerCase('ro').includes(q)));$('product-list').innerHTML=rows.slice(0,limit).map(p=>`<article class="product-card"><div class="row"><span class="product-code">${h(p.short_code?'LIVE '+p.short_code:p.code)}</span><span class="badge ${p.available?'available':''}">${p.available?'Disponibil':'Rezervat'}</span></div><h2>${h(p.name)}</h2><p>${h(p.condition)}${p.photos.length?' · '+p.photos.length+' poze':''}</p><strong>${h(money(p.price))}</strong><small>Cod: ${h(p.code)} · EAN: ${h(p.ean||'—')}</small><div class="row">${btn('Detalii / poze','product',p.id)}${canEdit()&&p.available?btn(cart.some(x=>x.id===p.id)?'Elimină':'Adaugă','add',p.id,cart.some(x=>x.id===p.id)?'selected':'primary'):''}</div></article>`).join('')||'<p class="empty">Nu am găsit produse disponibile pentru această căutare.</p>';$('product-more').innerHTML=rows.length>limit?btn(`Mai multe (${rows.length} rezultate)`,'products-more'):'';};
+ $('barcode-photo').addEventListener('change',ev=>{const file=ev.target.files[0];if(file)window.amsScanPhoto(file,code=>run(()=>scannedProduct(code)));ev.target.value='';});
  $('product-search').addEventListener('input',()=>{limit=40;show();});$('available-only').addEventListener('change',show);show();
+}
+async function scannedProduct(code){
+ query=String(code).trim();
+ await loadCatalog();
+ if(!window.amsBackend?.ready)return;
+ if(!['live','magazin'].includes(page()))return;
+ const matches=products.filter(p=>p.available&&[p.code,p.ean,p.short_code].some(value=>String(value||'')===query));
+ if(page()==='live'&&canEdit()){
+  const available=matches.filter(p=>!cart.some(item=>item.id===p.id));
+  if(available.length===1){
+   cart.push({...available[0]});
+   query='';
+   notice('Adăugat: '+available[0].name+'. Poți scana următorul produs sau apăsa Date client.');
+  }else if(available.length>1)notice('Codul corespunde mai multor bucăți. Alege produsul cu butonul Adaugă.');
+  else notice(matches.length?'Produsul este deja în comandă.':'Nu am găsit o bucată disponibilă pentru codul '+query+'.',!matches.length);
+ }
+ renderCatalog();
 }
 function editOrder(o=null){
  if(!canEdit())return;const selected=o?o.items.map(x=>({...x,id:String(x.id)})):cart.map(x=>({...x}));if(!selected.length){location.hash='#live';notice('Adaugă produsele clientului din stoc.');render();return;}
@@ -110,7 +128,7 @@ async function showLegacy(){const e=epoch;try{const data=await window.amsBackend
 document.addEventListener('click',ev=>{const b=ev.target.closest('[data-action]');if(!b)return;const action=b.dataset.action,id=b.dataset.id;run(async()=>{
  if(action==='refresh'){await refresh();notice('Date actualizate.');}if(action==='new')await newOrder();
  if(action==='add'){const p=products.find(x=>x.id===id);if(cart.some(x=>x.id===id))cart=cart.filter(x=>x.id!==id);else cart.push({...p});renderCatalog();}
- if(action==='scan')window.amsScan(code=>{query=code;renderCatalog();});if(action==='products-more'){limit+=40;renderCatalog();}
+ if(action==='scan-photo')$('barcode-photo').click();if(action==='scan')window.amsScan(code=>run(()=>scannedProduct(code)));if(action==='products-more'){limit+=40;renderCatalog();}
  if(action==='more'){const rows=await api('list',{offset});const seen=new Set(orders.map(o=>o.id));orders.push(...rows.filter(o=>!seen.has(o.id)));offset+=rows.length;more=rows.length===100;render();}
  if(action==='order')await openOrder(id);if(action==='edit')editOrder(await api('get',{id}));if(action==='product')await productDetails(id);if(action==='price-edit')await editStockPrice(id);if(action==='packing')await packing(id);if(action==='contact')await contact(id);if(action==='print')window.print();
  if(action==='address'){const o=await api('get',{id});await navigator.clipboard.writeText([o.customer.name,o.customer.phone,o.customer.address,o.customer.city,o.customer.county,o.customer.postal].filter(Boolean).join('\n'));notice('Adresa a fost copiată.');}

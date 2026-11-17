@@ -13,3 +13,18 @@ window.amsScan=async callback=>{
  }catch(error){if(generation===epoch)document.getElementById('scan-message').textContent='Camera nu este disponibilă. Verifică permisiunea sau introdu codul manual.';}
 };
 document.getElementById('stop-scan').addEventListener('click',stop);dialog.addEventListener('cancel',stop);window.addEventListener('ams:signed-out',stop);
+
+window.amsScanPhoto=async(file,callback)=>{
+ stop();
+ const generation=epoch;
+ dialog.showModal();
+ document.getElementById('scan-message').textContent='Se citește codul din fotografie…';
+ const url=URL.createObjectURL(file);
+ try{
+  const result=await new BrowserMultiFormatReader().decodeFromImageUrl(url);
+  if(generation!==epoch)return;
+  stop();callback(result.getText());
+ }catch{
+  if(generation===epoch)document.getElementById('scan-message').textContent='Codul nu se poate citi. Încearcă o fotografie clară, cu toate barele vizibile, sau introdu codul manual.';
+ }finally{URL.revokeObjectURL(url);}
+};
