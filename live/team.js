@@ -17,18 +17,9 @@
     const {h, btn, form} = ui();
     const canWork = ['manager', 'operator', 'packer'].includes(backend().identity.role);
     const canLink = ['manager', 'operator'].includes(backend().identity.role);
-    const mine = detail.assigned_to === backend().identity.user_id;
-    const checked = new Set(detail.checks.map(c => c.product_id));
-    form('Pregătire · comanda #' + o.number, `
-      <p><b>Responsabil:</b> ${h(detail.assigned_name || 'Nepreluată')}</p>
-      <div class="detail-actions">${canWork && !detail.assigned_to ? btn('Preiau comanda','team-claim',id) : ''}
-      ${canWork && (mine || backend().identity.role === 'manager') && detail.assigned_to ? btn('Eliberează responsabilul','team-release',id) : ''}</div>
-      <h3>${checked.size} din ${o.items.length} bucăți verificate</h3>
-      <div class="order-lines">${o.items.map(i => `<p>${checked.has(String(i.id)) ? '✓' : '○'} ${h(i.code)} · ${h(i.name)}</p>`).join('')}</div>
-      ${mine && ['new','packing'].includes(o.fulfillment) ? `<label>Cod intern al bucății<input id="packing-code" autocomplete="off"></label><div class="detail-actions">${btn('Verifică acest cod','team-check',id)}${btn('Scanează cu camera','team-camera',id)}</div>` : ''}
-      <p class="hint">Fiecare bucată se verifică prin codul intern de pe eticheta magazinului. EAN-ul poate fi comun mai multor bucăți.</p>
+    form('Link pentru client · comanda #' + o.number, `
       ${canLink && ['draft','reserved'].includes(o.status) && ['new','packing'].includes(o.fulfillment) ? `<h3>Link pentru client</h3><p>Clientul vede produsele și completează adresa fără cont. Linkul expiră în 7 zile. Un link nou îl înlocuiește pe cel anterior.</p>${btn('Creează link client','team-link',id)}${detail.link_active ? btn('Revocă linkul','team-revoke',id) : ''}<div id="customer-link"></div>` : ''}
-      <div class="detail-actions">${canWork?btn('AWB automat GLS','gls-order',id):''}${btn('Înapoi la comandă','order',id)}</div>`);
+      <div class="detail-actions">${btn('Înapoi la comandă','order',id)}</div>`);
   }
   async function mutation(action, id, extra = {}) {
     const o = await backend().call('get', {id});
@@ -82,7 +73,7 @@
     let html='';
     if(page==='rapoarte') {
       const rows=await call('reports');
-      html=`<p class="hint">Sunt incluse toate comenzile fiecărei sesiuni. Valoarea exclude anulările și include transportul; nu reprezintă încasări confirmate.</p><div class="order-grid">${rows.map(r=>`<article class="order-card"><h2>${h(r.name)}</h2><p>${r.orders} comenzi · <b>${money(r.total)}</b></p><p>${r.reserved} rezervări · ${r.cancelled} anulări · ${r.unshipped} neexpediate</p></article>`).join('')}</div>`;
+      html=`<p class="hint">Sunt incluse toate comenzile fiecărei sesiuni. Valoarea exclude anulările și exclude transportul; nu reprezintă încasări confirmate.</p><div class="order-grid">${rows.map(r=>`<article class="order-card"><h2>${h(r.name)}</h2><p>${r.orders} comenzi · <b>${money(r.total)}</b></p><p>${r.reserved} rezervări · ${r.cancelled} anulări · ${r.unshipped} neexpediate</p></article>`).join('')}</div>`;
     } else if(page==='notificari') {
       const data=await call('events');
       html=`<div class="detail-actions">${btn('Marchează citite ('+data.unread+')','team-read')}${btn('Activează notificările pe acest telefon','team-push')}</div><p class="hint">Pe iPhone, deschide aplicația instalată pe ecranul principal pentru a permite notificările.</p>${data.events.map(e=>`<article class="order-card"><h3>${h(e.title)}</h3><p>${h(new Date(e.created_at).toLocaleString('ro-RO'))}</p>${btn('Deschide comanda','order',e.order_id)}</article>`).join('') || '<p>Nicio notificare încă.</p>'}`;

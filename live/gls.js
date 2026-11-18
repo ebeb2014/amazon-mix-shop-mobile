@@ -12,7 +12,7 @@
   document.getElementById('subtitle').textContent='Contul MyGLS al magazinului';
   document.getElementById('metrics').hidden=true;document.getElementById('actions').innerHTML='';
   document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#curier'));
-  document.getElementById('content').innerHTML=`<article class="order-card"><h2>${config.connected?'Cont GLS conectat':'Conectează MyGLS'}</h2><p>${config.connected?(config.mode==='test'?'MEDIU DE TEST · etichetele nu se folosesc la livrare':'Cont real · expedieri conform contractului GLS'):'Ai nevoie de emailul și parola MyGLS, codul de client din contract și adresa de ridicare.'}</p>${backend().identity.primary_admin?btn(config.connected?'Modifică / verifică setările':'Conectează contul GLS','gls-config'):'<p>Administratorul principal configurează contul.</p>'}</article><article class="order-card"><h3>Cum generezi AWB-ul</h3><p>Preia comanda, scanează toate bucățile, marchează coletul împachetat și finalizează bonul la magazin. În comandă, deschide „Responsabil / verificare / link client” → „AWB automat GLS”.</p><p>Confirmi strada, numărul, greutatea, data ridicării și suma ramburs. Eticheta PDF poate fi descărcată și imprimată. Configurarea nu creează expedieri.</p></article>`;
+  document.getElementById('content').innerHTML=`<article class="order-card"><h2>${config.connected?'Cont GLS conectat':'Conectează MyGLS'}</h2><p>${config.connected?(config.mode==='test'?'MEDIU DE TEST · etichetele nu se folosesc la livrare':'Cont real · expedieri conform contractului GLS'):'Ai nevoie de emailul și parola MyGLS, codul de client din contract și adresa de ridicare.'}</p>${backend().identity.primary_admin?btn(config.connected?'Modifică / verifică setările':'Conectează contul GLS','gls-config'):'<p>Administratorul principal configurează contul.</p>'}</article><article class="order-card"><h3>Cum generezi AWB-ul</h3><p>Fă comanda, apasă „Expediază” și generează AWB-ul. Pe calculator preiei aceeași comandă în bon, fără să introduci din nou produsele.</p><p>Confirmi strada, numărul, greutatea, data ridicării și suma ramburs. Eticheta PDF poate fi descărcată și imprimată. Configurarea nu creează expedieri.</p></article>`;
  }
  async function configure() {
   const ctx=ui().context(),g=generation;
@@ -46,12 +46,12 @@
   if(!config.connected){form('GLS neconectat','<p>Administratorul principal trebuie să conecteze contul din meniul Curier.</p>');return;}
   if(job.state) {
    const labels={ready:'AWB creat',pending:'Cerere în curs',unknown:'Rezultat de verificat în GLS',rejected:'Cerere respinsă de GLS'};
-   form('GLS · comanda #'+o.number,`<h3>${h(labels[job.state])}</h3>${job.mode==='test'?'<p><b>TEST · Nu folosi eticheta la livrare.</b></p>':''}<p>${h(job.awb||job.message||'Nu genera manual încă un colet înainte de verificare.')}</p><p>Referință GLS: ${h(job.reference)}</p>${job.state==='ready'?btn('Descarcă eticheta PDF','gls-label',id):job.state==='rejected'?btn('Corectează și reia cererea respinsă','gls-reset',id):btn('Verifică în GLS / recuperează eticheta','gls-resolve',id)}<div id="gls-download"></div>`);return;
+   form('GLS · comanda #'+o.number,`<h3>${h(labels[job.state])}</h3>${job.state==='ready'&&o.status==='reserved'?'<p>AWB-ul este gata. Pe PC: Vânzări → Comenzi online → Preia în bon. Produsele și sumele se preiau automat.</p>':''}${job.mode==='test'?'<p><b>TEST · Nu folosi eticheta la livrare.</b></p>':''}<p>${h(job.awb||job.message||'Nu genera manual încă un colet înainte de verificare.')}</p><p>Referință GLS: ${h(job.reference)}</p>${job.state==='ready'?btn('Descarcă eticheta PDF','gls-label',id):job.state==='rejected'?btn('Corectează și reia cererea respinsă','gls-reset',id):btn('Verifică în GLS / recuperează eticheta','gls-resolve',id)}<div id="gls-download"></div>`);return;
   }
-  if(o.status!=='paid'||o.fulfillment!=='packed'||o.delivery!=='curier'||o.awb){form('AWB · comanda #'+o.number,'<p>AWB-ul automat este disponibil după verificarea tuturor produselor, împachetare și finalizarea bonului. Comanda trebuie să fie pentru curier și să nu aibă deja AWB.</p>');return;}
+  if(!['reserved','paid'].includes(o.status)||!['new','packing','packed'].includes(o.fulfillment)||o.delivery!=='curier'||o.awb){form('AWB · comanda #'+o.number,'<p>Salvează și rezervă comanda pentru curier înainte de AWB. Dacă este preluată chiar acum la casa de marcat, finalizează bonul și actualizează lista. O comandă anulată, expediată sau returnată nu poate primi alt AWB.</p>');return;}
   const remaining=ui().remaining(o.goods_total,o.advance);
   const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Bucharest',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-  form('Generează AWB GLS · #'+o.number,`${config.mode==='test'?'<p><b>MEDIU DE TEST</b></p>':'<p>Se va crea o expediere reală în contul GLS, conform contractului tău.</p>'}<h3>${h(o.customer.name)}</h3><p>${h(o.customer.phone)} · ${h(o.customer.address)} · ${h(o.customer.city)} · ${h(o.customer.postal)}</p><p>Verifică separarea străzii și a numărului pentru eticheta GLS.</p>
+  form('Expediază · comanda #'+o.number,`${config.mode==='test'?'<p><b>MEDIU DE TEST</b></p>':'<p>Se va crea o expediere reală în contul GLS, conform contractului tău.</p>'}<h3>${h(o.customer.name)}</h3><p>${h(o.customer.phone)} · ${h(o.customer.address)} · ${h(o.customer.city)} · ${h(o.customer.postal)}</p><p>Verifică separarea străzii și a numărului pentru eticheta GLS.</p>
    ${field('postal','Cod poștal destinatar',o.customer.postal,'text','required pattern="[0-9]{6}" maxlength="6"')}
    ${field('street','Stradă (fără număr)','','text','required maxlength="200"')}
    ${field('house','Număr (doar cifre)','','text','required pattern="[0-9]+" maxlength="20"')}
@@ -62,7 +62,7 @@
    <p class="hint">Valoarea produselor minus avansul înregistrat. Cumpărătorul plătește transportul separat.</p>`,async fd=>{
     const request={action:'create',id,revision:o.revision,...Object.fromEntries(fd),cod:remaining,weight:Number(fd.get('weight'))};
     try{const result=await backend().glsRequest(request);ui().notice('AWB GLS creat: '+result.awb);await order(id);}catch(error){ui().close();await order(id);const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}
-   },'Generează AWB GLS');
+   },'Confirmă expedierea GLS');
  }
  document.addEventListener('click',event=>{
   const button=event.target.closest('[data-action^="gls-"]');if(!button)return;
