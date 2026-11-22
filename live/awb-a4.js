@@ -38,21 +38,59 @@
   for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
   return prepareBytes(bytes);
  }
- function printPreview(pdfWindow,blobUrl,filename){
-  if(!pdfWindow||pdfWindow.closed)return false;
-  const doc=pdfWindow.document;
+ let rendererPromise;
+ function loadRenderer(){
+  if(window.pdfjsLib?.getDocument)return Promise.resolve(window.pdfjsLib);
+  if(rendererPromise)return rendererPromise;
+  rendererPromise=new Promise((resolve,reject)=>{
+   const script=document.createElement('script');
+   script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+   script.onload=()=>{
+    if(!window.pdfjsLib?.getDocument){reject(new Error('Motorul de imprimare PDF nu este disponibil.'));return;}
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    resolve(window.pdfjsLib);
+   };
+   script.onerror=()=>reject(new Error('Nu se poate încărca motorul de imprimare din Chrome.'));
+   document.head.appendChild(script);
+  }).catch(error=>{rendererPromise=null;throw error;});
+  return rendererPromise;
+ }
+ async function printPreview(printWindow,blobUrl,filename){
+  if(!printWindow||printWindow.closed)return false;
+  // Convert PDF to high-resolution image instead of embedding it in a PDF viewer.
+  // This bypasses Chrome's "always download PDFs" and the Windows Adobe association.
+  const lib=await loadRenderer();
+  const task=lib.getDocument({url:blobUrl});
+  const pdf=await task.promise;
+  if(pdf.numPages!==1)throw new Error('AWB-ul trebuie să aibă o singură pagină.');
+  const page=await pdf.getPage(1);
+  const viewport=page.getViewport({scale:4});
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+  const ctx=canvas.getContext('2d',{alpha:false});
+  if(!ctx)throw new Error('Chrome nu poate pregăti pagina pentru imprimare.');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx,viewport,background:'#fff'}).promise;
+  const image=canvas.toDataURL('image/png');
+  try{await pdf.destroy();}catch{}
+  if(printWindow.closed)return false;
+  const doc=printWindow.document;
   doc.open();
-  doc.write('<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Imprimă AWB GLS centrat A4</title><style>body{margin:0;font:16px Arial,sans-serif;background:#f4f4f4}header{background:white;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}button,a{font:inherit;padding:9px 14px;border-radius:6px;cursor:pointer}iframe{border:0;width:100%;height:calc(100vh - 75px)}p{margin:0}</style></head><body><header><button id="print">Imprimă AWB A4</button><a id="download" download>Descarcă PDF centrat</a><p id="status">Se deschide previzualizarea...</p></header><iframe id="pdf" title="AWB GLS centrat pe A4"></iframe></body></html>');
+  doc.write('<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Imprimă AWB GLS A4</title><style>@page{size:A4 portrait;margin:0}*{box-sizing:border-box}body{margin:0;background:#e7e7e7;font:15px Arial,sans-serif}header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:12px;background:white}button,a{font:inherit;padding:8px 12px;cursor:pointer}#sheet{display:block;width:210mm;height:297mm;margin:18px auto;background:white;box-shadow:0 2px 15px #999}p{margin:0}@media print{html,body{margin:0;padding:0;background:white}header{display:none!important}#sheet{width:210mm;height:297mm;margin:0;box-shadow:none;page-break-after:avoid}}</style></head><body><header><button id="print" type="button">Imprimă pe A4</button><a id="download" download>Descarcă PDF centrat</a><p id="status">Previzualizare AWB, fără Adobe</p></header><img id="sheet" alt="AWB GLS centrat A4"></body></html>');
   doc.close();
-  const frame=doc.getElementById('pdf'),button=doc.getElementById('print'),download=doc.getElementById('download'),status=doc.getElementById('status');
-  download.href=blobUrl;download.download=filename;
-  const print=()=>{try{frame.contentWindow.focus();frame.contentWindow.print();}catch(e){status.textContent='Apasă Ctrl+P în previzualizarea PDF.';}};
+  const img=doc.getElementById('sheet');
+  const button=doc.getElementById('print');
+  const dl=doc.getElementById('download');
+  const status=doc.getElementById('status');
+  dl.href=blobUrl;dl.download=filename;
+  const print=()=>{try{printWindow.focus();printWindow.print();}catch(error){status.textContent='Nu se poate deschide imprimarea automat. Apasă Ctrl+P.';}};
   button.addEventListener('click',print);
-  frame.addEventListener('load',()=>{
-   status.textContent='AWB centrat pe A4. Dacă nu apare fereastra de imprimare, apasă „Imprimă AWB A4”.';
-   setTimeout(print,350);
-  },{once:true});
-  frame.src=blobUrl;
+  img.onload=()=>{
+   status.textContent='Etichetă centrată pe A4. Dacă nu apare dialogul, apasă Imprimă pe A4.';
+   setTimeout(()=>{if(!printWindow.closed)print();},400);
+  };
+  img.onerror=()=>{status.textContent='Previzualizarea nu s-a încărcat. Folosește butonul de descărcare PDF.';};
+  img.src=image;
   return true;
  }
  async function prepareFile(file){
