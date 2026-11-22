@@ -32,9 +32,32 @@
   if(!response.ok)throw new Error('Eroare PDF GLS: '+response.status);
   return prepareBytes(await response.arrayBuffer());
  }
+ async function prepareBase64(base64){
+  if(typeof base64!=='string'||base64.length<8||base64.length>15000000)throw new Error('Răspuns PDF GLS invalid.');
+  const binary=atob(base64),bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  return prepareBytes(bytes);
+ }
+ function printPreview(pdfWindow,blobUrl,filename){
+  if(!pdfWindow||pdfWindow.closed)return false;
+  const doc=pdfWindow.document;
+  doc.open();
+  doc.write('<!doctype html><html lang="ro"><head><meta charset="utf-8"><title>Imprimă AWB GLS centrat A4</title><style>body{margin:0;font:16px Arial,sans-serif;background:#f4f4f4}header{background:white;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}button,a{font:inherit;padding:9px 14px;border-radius:6px;cursor:pointer}iframe{border:0;width:100%;height:calc(100vh - 75px)}p{margin:0}</style></head><body><header><button id="print">Imprimă AWB A4</button><a id="download" download>Descarcă PDF centrat</a><p id="status">Se deschide previzualizarea...</p></header><iframe id="pdf" title="AWB GLS centrat pe A4"></iframe></body></html>');
+  doc.close();
+  const frame=doc.getElementById('pdf'),button=doc.getElementById('print'),download=doc.getElementById('download'),status=doc.getElementById('status');
+  download.href=blobUrl;download.download=filename;
+  const print=()=>{try{frame.contentWindow.focus();frame.contentWindow.print();}catch(e){status.textContent='Apasă Ctrl+P în previzualizarea PDF.';}};
+  button.addEventListener('click',print);
+  frame.addEventListener('load',()=>{
+   status.textContent='AWB centrat pe A4. Dacă nu apare fereastra de imprimare, apasă „Imprimă AWB A4”.';
+   setTimeout(print,350);
+  },{once:true});
+  frame.src=blobUrl;
+  return true;
+ }
  async function prepareFile(file){
   if(!file||file.type!=='application/pdf'&&!/\.pdf$/i.test(file.name))throw new Error('Alege fișierul PDF descărcat de la GLS.');
   return prepareBytes(await file.arrayBuffer());
  }
- window.amsGLSA4={prepare,prepareFile};
+ window.amsGLSA4={prepare,prepareFile,prepareBase64,printPreview};
 })();
