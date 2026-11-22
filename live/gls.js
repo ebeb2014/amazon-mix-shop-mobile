@@ -74,18 +74,22 @@
     if(button.dataset.action==='gls-reset'){await backend().gls('reset_rejected',{id});if(context===ui().context())await order(id);}
     if(button.dataset.action==='gls-resolve'){await backend().glsRequest({action:'resolve',id});if(context===ui().context())await order(id);}
     if(button.dataset.action==='gls-label') {
-     // Open a blank window synchronously from the click: browsers block windows opened after await.
+     // A user click opens the tab before any await, so popup blockers do not block it.
      const pdfWindow=window.open('about:blank','_blank');
-     if(pdfWindow){pdfWindow.document.title='Se pregătește eticheta GLS';pdfWindow.document.body.textContent='Se pregătește AWB-ul PDF...';}
+     if(pdfWindow){pdfWindow.document.title='Se pregătește AWB A4';pdfWindow.document.body.textContent='Centrare AWB GLS pe A4...';}
      const download=document.getElementById('gls-download');
-     if(download)download.textContent='Se pregătește eticheta PDF...';
+     if(download)download.textContent='Se pregătește eticheta GLS centrată pe A4...';
      try {
       const result=await backend().glsRequest({action:'label',id});
-      if(!result?.url||!/^https:\/\//i.test(result.url))throw new Error('GLS nu a furnizat un link PDF valid.');
+      if(!result?.url||!/^https:\/\//i.test(result.url))throw new Error('GLS nu a furnizat linkul PDF.');
       if(context!==ui().context()){if(pdfWindow&&!pdfWindow.closed)pdfWindow.close();return;}
-      if(pdfWindow&&!pdfWindow.closed)pdfWindow.location.replace(result.url);
+      let centeredUrl=null,issue='';
+      try{centeredUrl=await window.amsGLSA4.prepare(result.url);}
+      catch(error){issue=error.message||'PDF-ul nu a putut fi centrat.';}
+      const openUrl=centeredUrl||result.url;
+      if(pdfWindow&&!pdfWindow.closed)pdfWindow.location.replace(openUrl);
       const target=document.getElementById('gls-download');
-      if(target)target.innerHTML=`<p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Deschide din nou AWB PDF (A4)</a></p><p><a href="${ui().h(result.url)}" download>Descarcă fișierul PDF</a></p><p class="hint">${pdfWindow?'AWB-ul a fost deschis într-o filă nouă.':'Browserul a blocat deschiderea automată; apasă pe linkul de mai sus.'} Linkul este valabil 2 minute. Dacă s-a descărcat, apasă Ctrl+J și deschide PDF-ul, apoi Ctrl+P pentru imprimare. Bonul fiscal nu este necesar.</p>`;
+      if(target)target.innerHTML=`<p><b>${centeredUrl?'AWB centrat pe A4, gata pentru imprimare.':'AWB original GLS (centrarea indisponibilă).'}</b></p>${issue?'<p class="hint">'+ui().h(issue)+'</p>':''}<p><a href="${ui().h(openUrl)}" target="_blank" rel="noopener noreferrer">Deschide AWB ${centeredUrl?'centrat A4':'original'}</a></p>${centeredUrl?'<p><a href="'+ui().h(centeredUrl)+'" download="GLS-AWB-'+ui().h(String(id))+'-centrat-A4.pdf">Descarcă AWB centrat pe A4</a></p>':''}<p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Eticheta originală GLS (rezervă)</a></p><p class="hint">Tipărește din Chrome cu Ctrl+P, A4 portret, scară 100%. AWB-ul este independent de bonul fiscal. Linkul GLS original expiră după 2 minute.</p>`;
      }catch(error){if(pdfWindow&&!pdfWindow.closed)pdfWindow.close();if(download)download.textContent='Eticheta nu a putut fi deschisă: '+error.message;throw error;}
     }
    }catch(error){if(context===ui().context()&&document.getElementById('modal').open){const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}else throw error;}finally{button.disabled=false;}
