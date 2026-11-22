@@ -46,7 +46,7 @@
   if(!config.connected){form('GLS neconectat','<p>Administratorul principal trebuie să conecteze contul din meniul Curier.</p>');return;}
   if(job.state) {
    const labels={ready:'AWB creat',pending:'Cerere în curs',unknown:'Rezultat de verificat în GLS',rejected:'Cerere respinsă de GLS'};
-   form('GLS · comanda #'+o.number,`<h3>${h(labels[job.state])}</h3>${job.state==='ready'&&o.status==='reserved'?'<p>AWB-ul este gata și poate fi tipărit acum, fără bon fiscal. Bonul se emite separat în aplicația desktop.</p>':''}${job.mode==='test'?'<p><b>TEST · Nu folosi eticheta la livrare.</b></p>':''}<p>${h(job.awb||job.message||'Nu genera manual încă un colet înainte de verificare.')}</p><p>Referință GLS: ${h(job.reference)}</p>${job.state==='ready'?btn('Descarcă eticheta PDF','gls-label',id):job.state==='rejected'?btn('Corectează și reia cererea respinsă','gls-reset',id):btn('Verifică în GLS / recuperează eticheta','gls-resolve',id)}<div id="gls-download"></div>`);return;
+   form('GLS · comanda #'+o.number,`<h3>${h(labels[job.state])}</h3>${job.state==='ready'&&o.status==='reserved'?'<p>AWB-ul este gata și poate fi tipărit acum, fără bon fiscal. Bonul se emite separat în aplicația desktop.</p>':''}${job.mode==='test'?'<p><b>TEST · Nu folosi eticheta la livrare.</b></p>':''}<p>${h(job.awb||job.message||'Nu genera manual încă un colet înainte de verificare.')}</p><p>Referință GLS: ${h(job.reference)}</p>${job.state==='ready'?btn('Descarcă eticheta PDF','gls-label',id):job.state==='rejected'?btn('Corectează și reia cererea respinsă','gls-reset',id):btn('Verifică în GLS / recuperează eticheta','gls-resolve',id)}<div id="gls-download"></div><p><label for="gls-local-pdf">Dacă PDF-ul descărcat este necentrat, alege-l aici ca să-l centrezi pe A4, fără bon fiscal:</label><input id="gls-local-pdf" type="file" accept="application/pdf,.pdf"></p><p id="gls-local-status" role="status"></p>`);return;
   }
   if(!['reserved','paid'].includes(o.status)||!['new','packing','packed'].includes(o.fulfillment)||o.delivery!=='curier'||o.awb){form('AWB · comanda #'+o.number,'<p>Pentru a crea AWB fără bon fiscal, salvează și rezervă comanda cu livrare prin curier. Nu este necesar bonul. O comandă anulată, expediată sau returnată nu poate primi alt AWB.</p>');return;}
   const remaining=ui().remaining(o.goods_total,o.advance);
@@ -64,6 +64,17 @@
     try{const result=await backend().glsRequest(request);ui().notice('AWB GLS creat: '+result.awb);await order(id);}catch(error){ui().close();await order(id);const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}
    },'Confirmă expedierea GLS');
  }
+ document.addEventListener('change',async event=>{
+  if(event.target.id!=='gls-local-pdf')return;
+  const file=event.target.files?.[0],status=document.getElementById('gls-local-status');
+  if(!file||!status)return;
+  status.textContent='Se centrează PDF-ul pe foaia A4...';
+  try{
+   const centered=await window.amsGLSA4.prepareFile(file);
+   if(!status.isConnected){URL.revokeObjectURL(centered);return;}
+   status.innerHTML=`<b>AWB centrat pe A4.</b> <a href="${centered}" download="GLS-AWB-centrat-A4.pdf">Descarcă PDF-ul centrat</a> · <a href="${centered}" target="_blank" rel="noopener noreferrer">Deschide pentru imprimare</a>`;
+  }catch(error){status.textContent='Nu s-a putut centra PDF-ul: '+error.message;}
+ });
  document.addEventListener('click',event=>{
   const button=event.target.closest('[data-action^="gls-"]');if(!button)return;
   ui().run(async()=>{
@@ -87,9 +98,9 @@
       try{centeredUrl=await window.amsGLSA4.prepare(result.url);}
       catch(error){issue=error.message||'PDF-ul nu a putut fi centrat.';}
       const openUrl=centeredUrl||result.url;
-      if(pdfWindow&&!pdfWindow.closed)pdfWindow.location.replace(openUrl);
+      if(pdfWindow&&!pdfWindow.closed){if(centeredUrl)pdfWindow.location.replace(centeredUrl);else pdfWindow.close();}
       const target=document.getElementById('gls-download');
-      if(target)target.innerHTML=`<p><b>${centeredUrl?'AWB centrat pe A4, gata pentru imprimare.':'AWB original GLS (centrarea indisponibilă).'}</b></p>${issue?'<p class="hint">'+ui().h(issue)+'</p>':''}<p><a href="${ui().h(openUrl)}" target="_blank" rel="noopener noreferrer">Deschide AWB ${centeredUrl?'centrat A4':'original'}</a></p>${centeredUrl?'<p><a href="'+ui().h(centeredUrl)+'" download="GLS-AWB-'+ui().h(String(id))+'-centrat-A4.pdf">Descarcă AWB centrat pe A4</a></p>':''}<p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Eticheta originală GLS (rezervă)</a></p><p class="hint">Tipărește din Chrome cu Ctrl+P, A4 portret, scară 100%. AWB-ul este independent de bonul fiscal. Linkul GLS original expiră după 2 minute.</p>`;
+      if(target)target.innerHTML=`<p><b>${centeredUrl?'AWB centrat pe A4, gata pentru imprimare.':'Centrarea automată a eșuat. Folosește opțiunea «Alege PDF-ul descărcat» de mai jos.'}</b></p>${issue?'<p class="hint">'+ui().h(issue)+'</p>':''}<p><a href="${ui().h(openUrl)}" target="_blank" rel="noopener noreferrer">Deschide AWB ${centeredUrl?'centrat A4':'original'}</a></p>${centeredUrl?'<p><a href="'+ui().h(centeredUrl)+'" download="GLS-AWB-'+ui().h(String(id))+'-centrat-A4.pdf">Descarcă AWB centrat pe A4</a></p>':''}<p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Eticheta originală GLS (rezervă)</a></p><p class="hint">Tipărește din Chrome cu Ctrl+P, A4 portret, scară 100%. AWB-ul este independent de bonul fiscal. Linkul GLS original expiră după 2 minute.</p>`;
      }catch(error){if(pdfWindow&&!pdfWindow.closed)pdfWindow.close();if(download)download.textContent='Eticheta nu a putut fi deschisă: '+error.message;throw error;}
     }
    }catch(error){if(context===ui().context()&&document.getElementById('modal').open){const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}else throw error;}finally{button.disabled=false;}
