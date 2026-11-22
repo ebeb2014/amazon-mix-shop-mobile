@@ -74,8 +74,19 @@
     if(button.dataset.action==='gls-reset'){await backend().gls('reset_rejected',{id});if(context===ui().context())await order(id);}
     if(button.dataset.action==='gls-resolve'){await backend().glsRequest({action:'resolve',id});if(context===ui().context())await order(id);}
     if(button.dataset.action==='gls-label') {
-     const result=await backend().glsRequest({action:'label',id});if(context!==ui().context())return;
-     document.getElementById('gls-download').innerHTML=`<p><a href="${ui().h(result.url)}" rel="noopener noreferrer">Deschide AWB PDF pentru imprimare (A4)</a></p><p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Deschide AWB într-o filă nouă</a></p><p class="hint">Linkul expiră după 2 minute. Dacă browserul descarcă PDF-ul, deschide fișierul din Descărcări (Ctrl+J) și imprimă-l cu Ctrl+P. Nu este nevoie să emiți bonul fiscal înainte.</p>`;
+     // Open a blank window synchronously from the click: browsers block windows opened after await.
+     const pdfWindow=window.open('about:blank','_blank');
+     if(pdfWindow){pdfWindow.document.title='Se pregătește eticheta GLS';pdfWindow.document.body.textContent='Se pregătește AWB-ul PDF...';}
+     const download=document.getElementById('gls-download');
+     if(download)download.textContent='Se pregătește eticheta PDF...';
+     try {
+      const result=await backend().glsRequest({action:'label',id});
+      if(!result?.url||!/^https:\/\//i.test(result.url))throw new Error('GLS nu a furnizat un link PDF valid.');
+      if(context!==ui().context()){if(pdfWindow&&!pdfWindow.closed)pdfWindow.close();return;}
+      if(pdfWindow&&!pdfWindow.closed)pdfWindow.location.replace(result.url);
+      const target=document.getElementById('gls-download');
+      if(target)target.innerHTML=`<p><a href="${ui().h(result.url)}" target="_blank" rel="noopener noreferrer">Deschide din nou AWB PDF (A4)</a></p><p><a href="${ui().h(result.url)}" download>Descarcă fișierul PDF</a></p><p class="hint">${pdfWindow?'AWB-ul a fost deschis într-o filă nouă.':'Browserul a blocat deschiderea automată; apasă pe linkul de mai sus.'} Linkul este valabil 2 minute. Dacă s-a descărcat, apasă Ctrl+J și deschide PDF-ul, apoi Ctrl+P pentru imprimare. Bonul fiscal nu este necesar.</p>`;
+     }catch(error){if(pdfWindow&&!pdfWindow.closed)pdfWindow.close();if(download)download.textContent='Eticheta nu a putut fi deschisă: '+error.message;throw error;}
     }
    }catch(error){if(context===ui().context()&&document.getElementById('modal').open){const target=document.getElementById('form-error');target.textContent=error.message;target.hidden=false;}else throw error;}finally{button.disabled=false;}
   });
