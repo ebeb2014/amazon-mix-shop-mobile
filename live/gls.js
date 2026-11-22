@@ -99,9 +99,9 @@
       const centered=await window.amsGLSA4.prepareBase64(response.pdf_base64);
       if(context!==ui().context()){URL.revokeObjectURL(centered);if(printWindow&&!printWindow.closed)printWindow.close();return;}
       const filename='GLS-'+String(response.awb||id).replace(/[^0-9a-zA-Z-]/g,'')+'-centrat-A4.pdf';
-      const opened=window.amsGLSA4.printPreview(printWindow,centered,filename);
+      const opened=await window.amsGLSA4.printPreview(printWindow,centered,filename);
       const container=document.getElementById('gls-download');
-      if(container)container.innerHTML=`<p><b>AWB centrat pe A4, pregătit pentru imprimare.</b></p><p><a href="${centered}" download="${ui().h(filename)}">Descarcă PDF A4 centrat</a></p><p><a href="${centered}" target="_blank" rel="noopener noreferrer">Deschide PDF-ul în browser</a></p><p class="hint">${opened?'Previzualizarea de imprimare este în fereastra nouă.':'Browserul a blocat fereastra nouă. Deschide PDF-ul din linkul de mai sus și apasă Ctrl+P.'} Alege A4 portret și scară 100%. Nu este nevoie de bon fiscal.</p>`;
+      if(container)container.innerHTML=`<p><b>AWB centrat pe A4, pregătit pentru imprimare.</b></p><p><a href="${centered}" download="${ui().h(filename)}">Descarcă PDF A4 centrat</a></p><p><a href="${centered}" target="_blank" rel="noopener noreferrer">Deschide PDF-ul în browser</a></p><p class="hint">${opened?'Previzualizarea A4 este deschisă în Chrome, fără Adobe.':'Browserul a blocat fereastra nouă. Deschide PDF-ul din linkul de mai sus și apasă Ctrl+P.'} Alege A4 portret și scară 100%. Nu este nevoie de bon fiscal.</p>`;
      }catch(error){
       if(printWindow&&!printWindow.closed)printWindow.close();
       if(target)target.textContent='Imprimarea directă nu a reușit: '+error.message+'. Poți folosi mai jos eticheta PDF descărcată.';
